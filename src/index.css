@@ -1,16 +1,71 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;700&family=Share+Tech+Mono&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  :root {
+  /* ── Cyber theme (default) ────────────────────────────── */
+  :root,
+  [data-theme='cyber'] {
     color-scheme: dark;
+
+    /* RGB channels for Tailwind opacity support */
+    --bg-950: 6, 22, 35;
+    --bg-900: 12, 34, 51;
+    --bg-800: 18, 52, 76;
+    --bg-700: 29, 75, 103;
+
+    --accent-300: 94, 234, 212;
+    --accent-400: 45, 212, 191;
+    --accent-500: 20, 184, 166;
+    --accent-600: 15, 118, 110;
+
+    --cta-300: 252, 169, 93;
+    --cta-400: 249, 115, 22;
+    --cta-500: 234, 88, 12;
+
+    --shadow-color: rgba(6, 22, 35, 0.95);
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+
+    --glow-orb-1: rgba(20, 184, 166, 0.2);
+    --glow-orb-2: rgba(234, 88, 12, 0.2);
+  }
+
+  /* ── Matrix theme ─────────────────────────────────────── */
+  [data-theme='matrix'] {
+    color-scheme: dark;
+
+    --bg-950: 0, 0, 0;
+    --bg-900: 10, 15, 10;
+    --bg-800: 13, 26, 13;
+    --bg-700: 20, 40, 20;
+
+    --accent-300: 102, 255, 102;
+    --accent-400: 0, 255, 65;
+    --accent-500: 0, 204, 51;
+    --accent-600: 0, 153, 38;
+
+    --cta-300: 102, 255, 102;
+    --cta-400: 0, 255, 65;
+    --cta-500: 0, 204, 51;
+
+    --shadow-color: rgba(0, 20, 0, 0.95);
+    --text-primary: #00ff41;
+    --text-secondary: #33cc33;
+
+    --glow-orb-1: rgba(0, 255, 65, 0.08);
+    --glow-orb-2: rgba(0, 204, 51, 0.06);
   }
 
   body {
     @apply m-0 min-h-screen bg-slatewave-950 font-sans text-slate-100;
+  }
+
+  [data-theme='matrix'] body {
+    font-family: 'Share Tech Mono', 'IBM Plex Mono', monospace;
+    color: var(--text-primary);
   }
 
   #root {
@@ -19,6 +74,7 @@
 }
 
 @layer components {
+  /* ── Shared component classes ─────────────────────────── */
   .field {
     @apply w-full rounded-xl border border-white/15 bg-slatewave-800/70 px-3 py-2 text-sm text-slate-100 outline-none transition placeholder:text-slate-400/75 focus:border-tide-400 focus:ring-2 focus:ring-tide-500/30;
   }
@@ -45,5 +101,170 @@
 
   .badge {
     @apply rounded-full border border-white/15 bg-white/10 px-2 py-1;
+  }
+
+  /* ── Matrix theme overrides ───────────────────────────── */
+  [data-theme='matrix'] .field {
+    @apply rounded-none border-green-500/30 bg-black/80 text-green-300;
+    box-shadow: inset 0 0 6px rgba(0, 255, 65, 0.06);
+  }
+
+  [data-theme='matrix'] .field::placeholder {
+    color: rgba(0, 200, 50, 0.35);
+  }
+
+  [data-theme='matrix'] .field:focus {
+    border-color: #00ff41;
+    box-shadow: 0 0 8px rgba(0, 255, 65, 0.2), inset 0 0 6px rgba(0, 255, 65, 0.06);
+  }
+
+  [data-theme='matrix'] .btn-primary {
+    @apply rounded-none border-green-400/60 bg-green-500/20 font-mono text-green-300;
+    background-image: none;
+    text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.15);
+  }
+
+  [data-theme='matrix'] .btn-primary:hover {
+    background-color: rgba(0, 200, 50, 0.3);
+    box-shadow: 0 0 15px rgba(0, 255, 65, 0.25);
+  }
+
+  [data-theme='matrix'] .btn-secondary {
+    @apply rounded-none border-green-500/25 bg-green-500/10 font-mono text-green-400;
+  }
+
+  [data-theme='matrix'] .btn-secondary:hover {
+    background-color: rgba(0, 200, 50, 0.15);
+    box-shadow: 0 0 8px rgba(0, 255, 65, 0.1);
+  }
+
+  [data-theme='matrix'] .metric-card {
+    @apply rounded-none border-green-500/20 bg-green-500/5;
+    box-shadow: inset 0 0 8px rgba(0, 255, 65, 0.04);
+  }
+
+  [data-theme='matrix'] .metric-label {
+    color: rgba(0, 255, 65, 0.55);
+  }
+
+  [data-theme='matrix'] .metric-value {
+    color: #66ff66;
+    text-shadow: 0 0 6px rgba(0, 255, 65, 0.3);
+  }
+
+  [data-theme='matrix'] .badge {
+    @apply rounded-none border-green-500/20 bg-green-500/10 text-green-400;
+  }
+
+  /* Matrix glassmorphism replacement */
+  [data-theme='matrix'] .shadow-glass {
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.06), 0 18px 45px -22px rgba(0, 20, 0, 0.95);
+  }
+
+  /* Matrix scrollbar */
+  [data-theme='matrix'] ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  [data-theme='matrix'] ::-webkit-scrollbar-track {
+    background: #000;
+  }
+
+  [data-theme='matrix'] ::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 65, 0.2);
+    border-radius: 0;
+  }
+
+  [data-theme='matrix'] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 65, 0.35);
+  }
+
+  /* Matrix rounded overrides — sharp edges everywhere */
+  [data-theme='matrix'] .rounded-3xl,
+  [data-theme='matrix'] .rounded-2xl,
+  [data-theme='matrix'] .rounded-xl,
+  [data-theme='matrix'] .rounded-lg,
+  [data-theme='matrix'] .rounded-full {
+    border-radius: 0 !important;
+  }
+
+  /* Matrix border colors */
+  [data-theme='matrix'] .border-white\/10,
+  [data-theme='matrix'] .border-white\/15,
+  [data-theme='matrix'] .border-white\/20 {
+    border-color: rgba(0, 255, 65, 0.15);
+  }
+
+  /* Matrix text overrides */
+  [data-theme='matrix'] .text-slate-100 {
+    color: #ccffcc;
+  }
+
+  [data-theme='matrix'] .text-slate-200 {
+    color: #aaffaa;
+  }
+
+  [data-theme='matrix'] .text-slate-300 {
+    color: rgba(0, 255, 65, 0.6);
+  }
+
+  /* Matrix bg overrides */
+  [data-theme='matrix'] .bg-white\/5 {
+    background-color: rgba(0, 255, 65, 0.03);
+  }
+
+  [data-theme='matrix'] .bg-white\/10 {
+    background-color: rgba(0, 255, 65, 0.06);
+  }
+
+  [data-theme='matrix'] .backdrop-blur-xl {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Matrix scanline overlay */
+  .matrix-scanline {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 255, 65, 0.015) 2px,
+        rgba(0, 255, 65, 0.015) 4px
+      );
+  }
+
+  .matrix-scanline::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(transparent 50%, rgba(0, 0, 0, 0.04) 50%);
+    background-size: 100% 4px;
+    animation: scanline 8s linear infinite;
+    opacity: 0.3;
+  }
+
+  /* Matrix table overrides */
+  [data-theme='matrix'] table {
+    border-color: rgba(0, 255, 65, 0.1);
+  }
+
+  [data-theme='matrix'] th {
+    color: rgba(0, 255, 65, 0.7);
+  }
+
+  [data-theme='matrix'] tr:hover {
+    background-color: rgba(0, 255, 65, 0.04) !important;
+  }
+
+  /* Matrix selection */
+  [data-theme='matrix'] ::selection {
+    background: rgba(0, 255, 65, 0.3);
+    color: #fff;
   }
 }
