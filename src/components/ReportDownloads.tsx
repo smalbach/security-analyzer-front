@@ -1,4 +1,4 @@
-﻿import type { ReportFormat } from '../types/api';
+import type { ReportFormat } from '../types/api';
 
 type ReportDownloadsProps = {
   analysisId: string;
@@ -13,7 +13,7 @@ export function ReportDownloads({
 }: ReportDownloadsProps) {
   return (
     <section className="rounded-3xl border border-white/10 bg-slatewave-900/75 p-5 shadow-glass backdrop-blur-xl md:p-6">
-      <h2 className="text-xl font-semibold">Descarga de reportes</h2>
+      <h2 className="text-xl font-semibold">Report Downloads</h2>
       <p className="mt-2 break-all text-sm text-slate-300">
         analysisId: <strong>{analysisId}</strong>
       </p>
@@ -25,7 +25,7 @@ export function ReportDownloads({
           disabled={downloadingFormat !== null}
           onClick={() => onDownload('json')}
         >
-          {downloadingFormat === 'json' ? 'Descargando...' : 'Descargar JSON'}
+          {downloadingFormat === 'json' ? 'Downloading...' : 'Download JSON'}
         </button>
 
         <button
@@ -34,7 +34,7 @@ export function ReportDownloads({
           disabled={downloadingFormat !== null}
           onClick={() => onDownload('html')}
         >
-          {downloadingFormat === 'html' ? 'Descargando...' : 'Descargar HTML'}
+          {downloadingFormat === 'html' ? 'Downloading...' : 'Download HTML'}
         </button>
 
         <button
@@ -43,7 +43,7 @@ export function ReportDownloads({
           disabled={downloadingFormat !== null}
           onClick={() => onDownload('pdf')}
         >
-          {downloadingFormat === 'pdf' ? 'Descargando...' : 'Descargar PDF'}
+          {downloadingFormat === 'pdf' ? 'Downloading...' : 'Download PDF'}
         </button>
       </div>
     </section>

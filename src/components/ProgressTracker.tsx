@@ -1,4 +1,4 @@
-﻿import type { AnalysisStatus, StatusResponse } from '../types/api';
+import type { AnalysisStatus, StatusResponse, StatusStep } from '../types/api';
 
 type ProgressTrackerProps = {
   analysisId: string;
@@ -14,6 +14,14 @@ const STATUS_STYLE: Record<AnalysisStatus, string> = {
   failed: 'bg-red-500/20 text-red-100 border-red-300/40',
 };
 
+const STEP_STATUS_STYLE: Record<string, string> = {
+  pending: 'border-white/20 bg-white/5 text-slate-300',
+  running: 'border-sky-300/40 bg-sky-500/15 text-sky-100',
+  completed: 'border-emerald-300/40 bg-emerald-500/15 text-emerald-100',
+  failed: 'border-red-300/40 bg-red-500/15 text-red-100',
+  skipped: 'border-slate-300/30 bg-slate-500/15 text-slate-200',
+};
+
 export function ProgressTracker({
   analysisId,
   status,
@@ -22,26 +30,39 @@ export function ProgressTracker({
 }: ProgressTrackerProps) {
   const state = status?.status ?? 'pending';
   const statusStyle = STATUS_STYLE[state];
+  const progress =
+    typeof status?.progress === 'object' && status.progress ? status.progress : null;
 
   const detail =
     typeof status?.progress === 'string'
       ? status.progress
-      : status?.progress?.detail || status?.summary || 'Sin detalle de progreso';
+      : progress?.detail || status?.summary || 'No progress details available';
 
   const endpointsInfo =
-    typeof status?.progress === 'object' && status?.progress
-      ? `${status.progress.endpointsTested ?? 0}/${status.progress.endpointsTotal ?? 0} endpoints`
+    progress &&
+    typeof progress.endpointsTested === 'number' &&
+    typeof progress.endpointsTotal === 'number'
+      ? `${progress.endpointsTested}/${progress.endpointsTotal} endpoints`
       : null;
 
   const elapsedInfo =
-    typeof status?.progress === 'object' && status?.progress?.elapsedSeconds !== undefined
-      ? `${status.progress.elapsedSeconds}s`
+    progress && typeof progress.elapsedSeconds === 'number'
+      ? `${progress.elapsedSeconds}s`
       : null;
+
+  const stepInfo =
+    progress && typeof progress.currentStep === 'number' && typeof progress.totalSteps === 'number'
+      ? `Step ${progress.currentStep}/${progress.totalSteps}`
+      : null;
+
+  const phaseInfo = progress?.phase ? `Phase: ${progress.phase}` : null;
+  const currentStepLabel = progress?.stepLabel || null;
+  const steps = progress?.steps ?? [];
 
   return (
     <section className="animate-rise rounded-3xl border border-white/10 bg-slatewave-900/75 p-5 shadow-glass backdrop-blur-xl md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold">Estado de analisis</h2>
+        <h2 className="text-xl font-semibold">Analysis Status</h2>
         <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] ${statusStyle}`}>
           {state}
         </span>
@@ -54,7 +75,7 @@ export function ProgressTracker({
 
       <div className="mt-4 space-y-2">
         <div className="flex items-center justify-between text-xs text-slate-300">
-          <span>Progreso</span>
+          <span>Progress</span>
           <span>{Math.round(progressPercent)}%</span>
         </div>
 
@@ -67,9 +88,12 @@ export function ProgressTracker({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-300">
-        {isPolling ? <span className="badge">Polling cada 5 segundos</span> : null}
+        {isPolling ? <span className="badge">Polling every 5 seconds</span> : null}
         {endpointsInfo ? <span className="badge">{endpointsInfo}</span> : null}
-        {elapsedInfo ? <span className="badge">Tiempo: {elapsedInfo}</span> : null}
+        {elapsedInfo ? <span className="badge">Time: {elapsedInfo}</span> : null}
+        {phaseInfo ? <span className="badge">{phaseInfo}</span> : null}
+        {stepInfo ? <span className="badge">{stepInfo}</span> : null}
+        {currentStepLabel ? <span className="badge">{currentStepLabel}</span> : null}
       </div>
 
       {status?.summary ? (
@@ -77,6 +101,35 @@ export function ProgressTracker({
           {status.summary}
         </p>
       ) : null}
+
+      {status?.error ? (
+        <p className="mt-3 rounded-xl border border-red-300/40 bg-red-500/15 p-3 text-sm text-red-100">
+          {status.error}
+        </p>
+      ) : null}
+
+      {steps.length > 0 ? (
+        <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+          <p className="text-sm font-semibold text-slate-100">Step Pipeline</p>
+          <div className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
+            {steps.map((step) => (
+              <div key={`${step.step}-${step.label}`} className="flex items-start gap-2">
+                <span className="badge">{step.step}</span>
+                <div className="flex-1">
+                  <p className="text-sm text-slate-100">{step.label}</p>
+                  <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.1em] ${getStepStatusStyle(step.status)}`}>
+                    {step.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function getStepStatusStyle(stepStatus: StatusStep['status']): string {
+  return STEP_STATUS_STYLE[stepStatus] || STEP_STATUS_STYLE.pending;
 }

@@ -1,8 +1,6 @@
 # API Security Analyzer Front
 
-Frontend minimal en React + TypeScript + Tailwind con un unico formulario para el endpoint:
-
-- `POST /analysis/preview-file`
+Frontend en React + TypeScript + Tailwind para ejecutar el flujo completo desde `POST /analysis/preview-file`.
 
 ## Requisitos
 
@@ -31,18 +29,12 @@ npm run build
 npm run preview
 ```
 
-## Campos implementados segun Swagger actual
+## Flujo implementado
 
-- `file` (requerido)
-- `baseUrl` (opcional)
-- `projectName` (opcional)
-- `crossUserPermutations` (`true|false`)
-- `testInjections` (`true|false`)
-- `testRateLimit` (`true|false`)
-- `requestTimeout` (ms)
-
-## Resultado mostrado
-
-1. `analysisId` devuelto por `preview-file`.
-2. Links GET construidos con ese ID (`status`, `results`, `report json/html/pdf`).
-3. IDs (`endpointId`) de endpoints con metodo `GET` dentro del bloque `preview.endpoints`.
+1. Formulario de upload con todos los campos de Swagger para `preview-file`.
+2. Inicio de analisis y obtencion de `analysisId`.
+3. Polling automatico cada 5 segundos a `GET /analysis/{id}/status`.
+4. Barra de progreso animada usando `progress.percentage`.
+5. Al completar, carga de `GET /analysis/{id}/results`.
+6. Descarga de reportes JSON/HTML/PDF.
+7. Visualizador JSON con filtros por endpoint, metodo, severidad, resultado, categoria y busqueda.

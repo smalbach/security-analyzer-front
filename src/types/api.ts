@@ -1,4 +1,4 @@
-﻿export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD';
 
 export type AnalysisStatus = 'pending' | 'running' | 'completed' | 'failed';
 
@@ -52,12 +52,23 @@ export interface StatusProgress {
   endpointsTested?: number;
   endpointsTotal?: number;
   elapsedSeconds?: number;
+  currentStep?: number;
+  totalSteps?: number;
+  stepLabel?: string;
+  steps?: StatusStep[];
+}
+
+export interface StatusStep {
+  step: number;
+  label: string;
+  status: string;
 }
 
 export interface StatusResponse {
   status: AnalysisStatus;
   progress?: StatusProgress | string;
   summary?: string;
+  error?: string | null;
 }
 
 export interface SecurityCheck {
@@ -121,6 +132,29 @@ export interface AiAnalysis {
   }[];
   executiveSummary: string;
   technicalSummary: string;
+}
+
+export interface AnalysisHistoryItem {
+  id: string;
+  projectName: string;
+  status: string;
+  startedAt: string;
+  completedAt: string | null;
+  totalEndpoints: number;
+  totalChecks: number;
+  totalPassed: number;
+  totalFailed: number;
+  criticalCount: number;
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+  securityScore: number;
+  riskLevel: string | null;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
 }
 
 export interface AnalysisReport {

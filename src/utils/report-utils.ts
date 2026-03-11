@@ -1,4 +1,4 @@
-﻿import type { AnalysisReport, EndpointTestResult, SecurityCheck, Severity } from '../types/api';
+import type { AnalysisReport, EndpointTestResult, SecurityCheck, Severity } from '../types/api';
 
 export type ReportFilters = {
   endpointId: string;

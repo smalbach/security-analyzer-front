@@ -1,22 +1,22 @@
-﻿import { useEffect, useRef, useState } from 'react';
-import type { ApiClient } from '../lib/api';
+import { useEffect, useRef, useState } from 'react';
+import { io } from 'socket.io-client';
 import type { AnalysisStatus, StatusResponse } from '../types/api';
 
-type PollingCallbacks = {
+type SocketCallbacks = {
   onStatus?: (status: StatusResponse) => void;
   onCompleted?: () => void;
-  onFailed?: () => void;
+  onFailed?: (status: StatusResponse) => void;
   onError?: (message: string) => void;
 };
 
 type UseAnalysisPollingArgs = {
-  client: ApiClient;
+  baseUrl: string;
   analysisId: string;
   enabled: boolean;
-} & PollingCallbacks;
+} & SocketCallbacks;
 
 export function useAnalysisPolling({
-  client,
+  baseUrl,
   analysisId,
   enabled,
   onStatus,
@@ -28,7 +28,7 @@ export function useAnalysisPolling({
   const [progressPercent, setProgressPercent] = useState(0);
   const [isPolling, setIsPolling] = useState(false);
 
-  const callbacksRef = useRef<PollingCallbacks>({ onStatus, onCompleted, onFailed, onError });
+  const callbacksRef = useRef<SocketCallbacks>({ onStatus, onCompleted, onFailed, onError });
   callbacksRef.current = { onStatus, onCompleted, onFailed, onError };
 
   useEffect(() => {
@@ -36,54 +36,49 @@ export function useAnalysisPolling({
       return;
     }
 
-    let cancelled = false;
+    let socketServerUrl: string;
+    try {
+      socketServerUrl = new URL(baseUrl).origin;
+    } catch {
+      socketServerUrl = baseUrl;
+    }
+
     setIsPolling(true);
 
-    const tick = async (): Promise<void> => {
-      try {
-        const nextStatus = await client.getStatus(analysisId);
+    const socket = io(`${socketServerUrl}/analysis`, {
+      query: { analysisId },
+    });
 
-        if (cancelled) {
-          return;
-        }
+    socket.on('progress', (data: StatusResponse) => {
+      setStatus(data);
+      callbacksRef.current.onStatus?.(data);
+      setProgressPercent((prev) => computeProgress(data, prev));
+    });
 
-        setStatus(nextStatus);
-        callbacksRef.current.onStatus?.(nextStatus);
+    socket.on('completed', (data: StatusResponse) => {
+      setStatus(data);
+      callbacksRef.current.onStatus?.(data);
+      setProgressPercent(100);
+      setIsPolling(false);
+      callbacksRef.current.onCompleted?.();
+    });
 
-        setProgressPercent((prev) => computeProgress(nextStatus, prev));
+    socket.on('failed', (data: StatusResponse) => {
+      setStatus(data);
+      setProgressPercent(100);
+      setIsPolling(false);
+      callbacksRef.current.onFailed?.(data);
+    });
 
-        if (nextStatus.status === 'completed') {
-          setProgressPercent(100);
-          setIsPolling(false);
-          callbacksRef.current.onCompleted?.();
-        }
-
-        if (nextStatus.status === 'failed') {
-          setProgressPercent(100);
-          setIsPolling(false);
-          callbacksRef.current.onFailed?.();
-        }
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
-        setIsPolling(false);
-        const message = error instanceof Error ? error.message : 'Error consultando estado';
-        callbacksRef.current.onError?.(message);
-      }
-    };
-
-    void tick();
-    const timer = window.setInterval(() => {
-      void tick();
-    }, 5000);
+    socket.on('connect_error', (err: Error) => {
+      setIsPolling(false);
+      callbacksRef.current.onError?.(err.message);
+    });
 
     return () => {
-      cancelled = true;
-      window.clearInterval(timer);
+      socket.disconnect();
     };
-  }, [analysisId, client, enabled]);
+  }, [analysisId, baseUrl, enabled]);
 
   return {
     status,
@@ -117,18 +112,26 @@ function extractPayloadPercentage(status: StatusResponse): number | undefined {
   }
 
   if (typeof status.progress.percentage !== 'number') {
-    return undefined;
+    const currentStep = status.progress.currentStep;
+    const totalSteps = status.progress.totalSteps;
+
+    const hasStepProgress =
+      typeof currentStep === 'number' &&
+      typeof totalSteps === 'number' &&
+      totalSteps > 0;
+
+    if (!hasStepProgress) {
+      return undefined;
+    }
+
+    return (currentStep / totalSteps) * 100;
   }
 
   return status.progress.percentage;
 }
 
 function clampProgress(value: number): number {
-  if (value < 0) {
-    return 0;
-  }
-  if (value > 100) {
-    return 100;
-  }
+  if (value < 0) return 0;
+  if (value > 100) return 100;
   return value;
 }

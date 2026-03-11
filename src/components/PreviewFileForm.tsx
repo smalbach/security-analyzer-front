@@ -1,4 +1,4 @@
-﻿import type { ChangeEvent, FormEvent } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 
 export type PreviewFormValues = {
   apiBaseUrl: string;
@@ -49,22 +49,22 @@ export function PreviewFileForm({
         </label>
 
         <label className="space-y-1 text-sm">
-          <span className="font-medium text-slate-100">Base URL override (opcional)</span>
+          <span className="font-medium text-slate-100">Base URL override (optional)</span>
           <input
             value={values.baseUrlOverride}
             onChange={(event) => onChange({ baseUrlOverride: event.target.value })}
             className="field"
-            placeholder="https://api.ejemplo.com"
+            placeholder="https://api.example.com"
           />
         </label>
 
         <label className="space-y-1 text-sm">
-          <span className="font-medium text-slate-100">Project name (opcional)</span>
+          <span className="font-medium text-slate-100">Project name (optional)</span>
           <input
             value={values.projectName}
             onChange={(event) => onChange({ projectName: event.target.value })}
             className="field"
-            placeholder="Mi API"
+            placeholder="My API"
           />
         </label>
 
@@ -82,7 +82,7 @@ export function PreviewFileForm({
         </label>
 
         <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3 text-sm md:col-span-2">
-          <p className="font-medium text-slate-100">Flags del endpoint</p>
+          <p className="font-medium text-slate-100">Endpoint flags</p>
 
           <label className="inline-flex items-center gap-2">
             <input
@@ -116,7 +116,7 @@ export function PreviewFileForm({
         </div>
 
         <label className="space-y-2 text-sm md:col-span-2">
-          <span className="font-medium text-slate-100">Archivo</span>
+          <span className="font-medium text-slate-100">File</span>
           <input
             type="file"
             accept=".md,.markdown,.txt"
@@ -124,14 +124,14 @@ export function PreviewFileForm({
             className="field file:mr-4 file:rounded-md file:border-0 file:bg-tide-500 file:px-3 file:py-1 file:text-sm file:font-medium file:text-slate-950"
           />
           {selectedFileName ? (
-            <p className="text-xs text-slate-300">Seleccionado: {selectedFileName}</p>
+            <p className="text-xs text-slate-300">Selected: {selectedFileName}</p>
           ) : null}
         </label>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
         <button type="submit" className="btn-primary" disabled={isSubmitting}>
-          {isSubmitting ? 'Procesando...' : 'Enviar archivo'}
+          {isSubmitting ? 'Processing...' : 'Submit file'}
         </button>
       </div>
     </form>

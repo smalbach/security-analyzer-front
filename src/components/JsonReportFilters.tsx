@@ -1,4 +1,4 @@
-﻿import type { Severity } from '../types/api';
+import type { Severity } from '../types/api';
 import type { ReportFilters } from '../utils/report-utils';
 
 type JsonReportFiltersProps = {
@@ -20,14 +20,14 @@ export function JsonReportFilters({
 }: JsonReportFiltersProps) {
   return (
     <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <h3 className="text-lg font-semibold">Filtros de resultados JSON</h3>
+      <h3 className="text-lg font-semibold">JSON Result Filters</h3>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <label className="space-y-1 text-sm">
-          <span>Buscar</span>
+          <span>Search</span>
           <input
             className="field"
-            placeholder="URL, regla o finding"
+            placeholder="URL, rule or finding"
             value={filters.search}
             onChange={(event) => onChange({ search: event.target.value })}
           />
@@ -40,7 +40,7 @@ export function JsonReportFilters({
             value={filters.endpointId}
             onChange={(event) => onChange({ endpointId: event.target.value })}
           >
-            <option value="all">Todos</option>
+            <option value="all">All</option>
             {endpointOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -50,13 +50,13 @@ export function JsonReportFilters({
         </label>
 
         <label className="space-y-1 text-sm">
-          <span>Metodo</span>
+          <span>Method</span>
           <select
             className="field"
             value={filters.method}
             onChange={(event) => onChange({ method: event.target.value })}
           >
-            <option value="all">Todos</option>
+            <option value="all">All</option>
             {methodOptions.map((method) => (
               <option key={method} value={method}>
                 {method}
@@ -66,7 +66,7 @@ export function JsonReportFilters({
         </label>
 
         <label className="space-y-1 text-sm">
-          <span>Severidad</span>
+          <span>Severity</span>
           <select
             className="field"
             value={filters.severity}
@@ -81,26 +81,26 @@ export function JsonReportFilters({
         </label>
 
         <label className="space-y-1 text-sm">
-          <span>Resultado</span>
+          <span>Result</span>
           <select
             className="field"
             value={filters.result}
             onChange={(event) => onChange({ result: event.target.value as ReportFilters['result'] })}
           >
-            <option value="all">Todos</option>
+            <option value="all">All</option>
             <option value="pass">Pass</option>
             <option value="fail">Fail</option>
           </select>
         </label>
 
         <label className="space-y-1 text-sm">
-          <span>Categoria</span>
+          <span>Category</span>
           <select
             className="field"
             value={filters.category}
             onChange={(event) => onChange({ category: event.target.value })}
           >
-            <option value="all">Todas</option>
+            <option value="all">All</option>
             {categoryOptions.map((category) => (
               <option key={category} value={category}>
                 {category}
