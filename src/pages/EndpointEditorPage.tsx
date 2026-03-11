@@ -12,6 +12,7 @@ import {
   type ResponseTab,
 } from '../components/endpoint-editor';
 import { useAuth } from '../contexts/AuthContext';
+import { isUnauthorizedError } from '../lib/api';
 import type { CreateEndpointRequest, RuleSelection, TestEndpointResponse } from '../types/api';
 
 export function EndpointEditorPage() {
@@ -116,6 +117,9 @@ export function EndpointEditorPage() {
         await api.updateEndpoint(projectId, endpointId, payload);
       }
     } catch (saveRequestError) {
+      if (isUnauthorizedError(saveRequestError)) {
+        return;
+      }
       setSaveError(
         saveRequestError instanceof Error ? saveRequestError.message : 'Failed to save endpoint',
       );
@@ -148,6 +152,9 @@ export function EndpointEditorPage() {
       );
       setResponse(result);
     } catch (requestError) {
+      if (isUnauthorizedError(requestError)) {
+        return;
+      }
       setSendError(requestError instanceof Error ? requestError.message : 'Request failed');
     } finally {
       setSending(false);

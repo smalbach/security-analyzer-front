@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { isUnauthorizedError } from '../../lib/api';
 import type { AuthConfig, Project } from '../../types/api';
 import { Button, FormField, Input, Select, Textarea } from '../ui';
 
@@ -43,6 +44,9 @@ export function SettingsTab({ project, onUpdated }: SettingsTabProps) {
       onUpdated(updatedProject);
       setSaved(true);
     } catch (saveError) {
+      if (isUnauthorizedError(saveError)) {
+        return;
+      }
       setError(saveError instanceof Error ? saveError.message : 'Failed to save');
     } finally {
       setSaving(false);

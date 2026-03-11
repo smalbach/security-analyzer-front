@@ -3,8 +3,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { AnalysisHero, AnalysisPreviewSection, AnalysisResultsSection } from '../components/analysis';
 import { PreviewFileForm, type PreviewFormValues } from '../components/PreviewFileForm';
 import { ProgressTracker } from '../components/ProgressTracker';
+import { useAuth } from '../contexts/AuthContext';
 import { useAnalysisPolling } from '../hooks/useAnalysisPolling';
-import { ApiClient } from '../lib/api';
+import { isUnauthorizedError } from '../lib/api';
 import type { AnalysisReport, PreviewAndStartResponse, ReportFormat } from '../types/api';
 import { getPreviewGetEndpoints } from '../utils/preview-utils';
 
@@ -19,6 +20,7 @@ const INITIAL_FORM: PreviewFormValues = {
 };
 
 export function AnalysisPage() {
+  const { api } = useAuth();
   const [formValues, setFormValues] = useState<PreviewFormValues>(INITIAL_FORM);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -33,7 +35,7 @@ export function AnalysisPage() {
   const [isFetchingResults, setIsFetchingResults] = useState(false);
   const [shouldPoll, setShouldPoll] = useState(false);
 
-  const client = useMemo(() => new ApiClient(formValues.apiBaseUrl), [formValues.apiBaseUrl]);
+  const client = useMemo(() => api.clone(formValues.apiBaseUrl), [api, formValues.apiBaseUrl]);
 
   const loadResults = useCallback(async () => {
     if (!activeAnalysisId) {
@@ -47,6 +49,9 @@ export function AnalysisPage() {
       setReport(nextReport);
       setInfo('Analysis completed. JSON report loaded.');
     } catch (loadError) {
+      if (isUnauthorizedError(loadError)) {
+        return;
+      }
       setError(loadError instanceof Error ? loadError.message : 'Failed to load JSON report');
     } finally {
       setIsFetchingResults(false);
@@ -149,6 +154,9 @@ export function AnalysisPage() {
       }
     } catch (submitError) {
       setShouldPoll(false);
+      if (isUnauthorizedError(submitError)) {
+        return;
+      }
       setError(submitError instanceof Error ? submitError.message : 'Failed to process file');
     } finally {
       setIsSubmitting(false);
@@ -176,6 +184,9 @@ export function AnalysisPage() {
       URL.revokeObjectURL(url);
       setInfo(`${format.toUpperCase()} report downloaded.`);
     } catch (downloadError) {
+      if (isUnauthorizedError(downloadError)) {
+        return;
+      }
       setError(downloadError instanceof Error ? downloadError.message : 'Failed to download report');
     } finally {
       setDownloadingFormat(null);

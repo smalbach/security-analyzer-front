@@ -55,6 +55,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const api = useMemo(() => new ApiClient(API_BASE_URL), []);
 
   useEffect(() => {
+    api.setUnauthorizedHandler(() => {
+      clearToken(api);
+      setUser(null);
+      setIsLoading(false);
+    });
+
+    return () => {
+      api.setUnauthorizedHandler(null);
+    };
+  }, [api]);
+
+  useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
 
     if (storedToken && isStoredTokenValid()) {

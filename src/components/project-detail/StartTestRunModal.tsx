@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { isUnauthorizedError } from '../../lib/api';
 import { DEFAULT_TEST_RUN_RULES } from '../../lib/testRuns';
 import type {
   Project,
@@ -69,6 +70,9 @@ export function StartTestRunModal({
       const run = await api.startTestRun(project.id, payload);
       onStarted(run);
     } catch (submitError) {
+      if (isUnauthorizedError(submitError)) {
+        return;
+      }
       setError(submitError instanceof Error ? submitError.message : 'Failed to start test run');
     } finally {
       setSubmitting(false);

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { isUnauthorizedError } from '../lib/api';
 import type { AnalysisReport, ReportFormat } from '../types/api';
 import { ReportDownloads } from '../components/ReportDownloads';
 import { JsonReportView } from '../components/JsonReportView';
@@ -36,6 +37,9 @@ export function ReportPage() {
       setVisibility(result.visibility ?? 'private');
       setCurrentShareToken(result.shareToken ?? null);
     } catch (err) {
+      if (isUnauthorizedError(err)) {
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to load report');
     } finally {
       setLoading(false);
@@ -62,6 +66,9 @@ export function ReportPage() {
       anchor.remove();
       URL.revokeObjectURL(url);
     } catch (downloadError) {
+      if (isUnauthorizedError(downloadError)) {
+        return;
+      }
       setError(downloadError instanceof Error ? downloadError.message : 'Failed to download report');
     } finally {
       setDownloadingFormat(null);
@@ -77,6 +84,9 @@ export function ReportPage() {
       setVisibility(result.visibility as 'private' | 'public');
       setCurrentShareToken(result.shareToken);
     } catch (err) {
+      if (isUnauthorizedError(err)) {
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to update visibility');
     } finally {
       setIsTogglingVisibility(false);

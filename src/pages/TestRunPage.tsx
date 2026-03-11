@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { EndpointResultCard, TestRunAiAnalysis, TestRunSummaryGrid } from '../components/test-run';
 import { Button, LinkButton } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
+import { isUnauthorizedError } from '../lib/api';
 import { TEST_RUN_STATUS_BADGE } from '../lib/testRuns';
 import type { EndpointTestResult, ReportFormat, TestRun } from '../types/api';
 
@@ -35,6 +36,9 @@ export function TestRunPage() {
         stopPolling();
       }
     } catch (loadError) {
+      if (isUnauthorizedError(loadError)) {
+        return;
+      }
       setError(loadError instanceof Error ? loadError.message : 'Failed to load test run');
       stopPolling();
     } finally {
@@ -65,6 +69,9 @@ export function TestRunPage() {
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (downloadError) {
+      if (isUnauthorizedError(downloadError)) {
+        return;
+      }
       alert(downloadError instanceof Error ? downloadError.message : 'Download failed');
     }
   };

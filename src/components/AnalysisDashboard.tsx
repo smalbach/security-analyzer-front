@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ApiClient } from '../lib/api';
+import { isUnauthorizedError } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import type { AnalysisHistoryItem, PaginatedResponse } from '../types/api';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-amber-500/20 text-amber-100 border-amber-300/40',
@@ -21,7 +20,7 @@ const RISK_BADGE: Record<string, string> = {
 
 export function AnalysisDashboard() {
   const navigate = useNavigate();
-  const client = useMemo(() => new ApiClient(API_BASE_URL), []);
+  const { api } = useAuth();
 
   const [data, setData] = useState<PaginatedResponse<AnalysisHistoryItem> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,7 +40,7 @@ export function AnalysisDashboard() {
     setLoading(true);
     setError('');
     try {
-      const result = await client.getHistory({
+      const result = await api.getHistory({
         page,
         limit: 15,
         projectName: debouncedSearch || undefined,
@@ -50,11 +49,14 @@ export function AnalysisDashboard() {
       });
       setData(result);
     } catch (err) {
+      if (isUnauthorizedError(err)) {
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to load analysis history');
     } finally {
       setLoading(false);
     }
-  }, [client, page, debouncedSearch]);
+  }, [api, page, debouncedSearch]);
 
   useEffect(() => {
     const searchChanged = previousDebouncedSearchRef.current !== debouncedSearch;
@@ -84,7 +86,7 @@ export function AnalysisDashboard() {
           <button
             type="button"
             className="btn-primary"
-            onClick={() => navigate('/new')}
+            onClick={() => navigate('/analysis/new')}
           >
             New Analysis
           </button>

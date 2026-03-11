@@ -31,9 +31,21 @@ interface ApiEnvelope<T = unknown> {
   timestamp: string;
 }
 
+export class ApiUnauthorizedError extends Error {
+  constructor(message = 'Unauthorized') {
+    super(message);
+    this.name = 'ApiUnauthorizedError';
+  }
+}
+
+export function isUnauthorizedError(error: unknown): error is ApiUnauthorizedError {
+  return error instanceof ApiUnauthorizedError;
+}
+
 export class ApiClient {
   private readonly baseUrl: string;
   private accessToken: string | null = null;
+  private unauthorizedHandler: (() => void) | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
@@ -41,6 +53,17 @@ export class ApiClient {
 
   setAccessToken(token: string | null): void {
     this.accessToken = token;
+  }
+
+  setUnauthorizedHandler(handler: (() => void) | null): void {
+    this.unauthorizedHandler = handler;
+  }
+
+  clone(baseUrl: string): ApiClient {
+    const client = new ApiClient(baseUrl);
+    client.accessToken = this.accessToken;
+    client.unauthorizedHandler = this.unauthorizedHandler;
+    return client;
   }
 
   // ─── Auth methods ───────────────────────────────────────────────
@@ -103,7 +126,7 @@ export class ApiClient {
     analysisId: string,
     visibility: 'private' | 'public',
   ): Promise<{ visibility: string; shareToken: string | null; shareUrl: string | null }> {
-    return this.requestWithAuth<{ visibility: string; shareToken: string | null; shareUrl: string | null }>(
+    return this.requestProtectedWithAuth<{ visibility: string; shareToken: string | null; shareUrl: string | null }>(
       `/analysis/${analysisId}/visibility`,
       {
         method: 'PATCH',
@@ -116,7 +139,7 @@ export class ApiClient {
   // ─── Projects ─────────────────────────────────────────────────
 
   async createProject(data: CreateProjectRequest): Promise<Project> {
-    return this.requestWithAuth<Project>('/projects', {
+    return this.requestProtectedWithAuth<Project>('/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -124,17 +147,17 @@ export class ApiClient {
   }
 
   async getProjects(_params?: { page?: number; limit?: number }): Promise<{ data: Project[] }> {
-    const result = await this.request<Project[] | { data: Project[] }>('/projects');
+    const result = await this.requestProtected<Project[] | { data: Project[] }>('/projects');
     // Backend returns plain array; normalize to { data } shape for callers
     return Array.isArray(result) ? { data: result } : result;
   }
 
   async getProject(id: string): Promise<Project> {
-    return this.request<Project>(`/projects/${id}`);
+    return this.requestProtected<Project>(`/projects/${id}`);
   }
 
   async updateProject(id: string, data: UpdateProjectRequest): Promise<Project> {
-    return this.requestWithAuth<Project>(`/projects/${id}`, {
+    return this.requestProtectedWithAuth<Project>(`/projects/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -142,13 +165,13 @@ export class ApiClient {
   }
 
   async deleteProject(id: string): Promise<void> {
-    return this.requestWithAuth<void>(`/projects/${id}`, { method: 'DELETE' });
+    return this.requestProtectedWithAuth<void>(`/projects/${id}`, { method: 'DELETE' });
   }
 
   // ─── Endpoints ────────────────────────────────────────────────
 
   async createEndpoint(projectId: string, data: CreateEndpointRequest): Promise<ApiEndpoint> {
-    return this.requestWithAuth<ApiEndpoint>(`/projects/${projectId}/endpoints`, {
+    return this.requestProtectedWithAuth<ApiEndpoint>(`/projects/${projectId}/endpoints`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -156,16 +179,18 @@ export class ApiClient {
   }
 
   async getEndpoints(projectId: string): Promise<ApiEndpoint[]> {
-    const result = await this.request<ApiEndpoint[] | { data: ApiEndpoint[] }>(`/projects/${projectId}/endpoints`);
+    const result = await this.requestProtected<ApiEndpoint[] | { data: ApiEndpoint[] }>(
+      `/projects/${projectId}/endpoints`,
+    );
     return Array.isArray(result) ? result : result.data;
   }
 
   async getEndpoint(projectId: string, endpointId: string): Promise<ApiEndpoint> {
-    return this.request<ApiEndpoint>(`/projects/${projectId}/endpoints/${endpointId}`);
+    return this.requestProtected<ApiEndpoint>(`/projects/${projectId}/endpoints/${endpointId}`);
   }
 
   async updateEndpoint(projectId: string, endpointId: string, data: Partial<CreateEndpointRequest>): Promise<ApiEndpoint> {
-    return this.requestWithAuth<ApiEndpoint>(`/projects/${projectId}/endpoints/${endpointId}`, {
+    return this.requestProtectedWithAuth<ApiEndpoint>(`/projects/${projectId}/endpoints/${endpointId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -173,7 +198,10 @@ export class ApiClient {
   }
 
   async deleteEndpoint(projectId: string, endpointId: string): Promise<void> {
-    return this.requestWithAuth<void>(`/projects/${projectId}/endpoints/${endpointId}`, { method: 'DELETE' });
+    return this.requestProtectedWithAuth<void>(
+      `/projects/${projectId}/endpoints/${endpointId}`,
+      { method: 'DELETE' },
+    );
   }
 
   async importEndpointsFromFile(projectId: string, file: File): Promise<ImportResult> {
@@ -183,20 +211,42 @@ export class ApiClient {
     const headers: Record<string, string> = {};
     if (this.accessToken) headers['Authorization'] = `Bearer ${this.accessToken}`;
 
-    const response = await fetch(`${this.baseUrl}/projects/${projectId}/endpoints/import/file`, {
+    let response = await fetch(`${this.baseUrl}/projects/${projectId}/endpoints/import/file`, {
       method: 'POST',
       body: formData,
       credentials: 'include',
       headers,
     });
 
-    if (!response.ok) throw new Error(await this.extractErrorMessage(response));
+    if (response.status === 401 && this.accessToken) {
+      const retryResponse = await this.retryAfterRefresh(
+        `${this.baseUrl}/projects/${projectId}/endpoints/import/file`,
+        {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+          headers,
+        },
+      );
+      if (retryResponse) {
+        response = retryResponse;
+      }
+    }
+
+    if (!response.ok) {
+      const message = await this.extractErrorMessage(response);
+      if (response.status === 401) {
+        this.handleUnauthorized();
+        throw new ApiUnauthorizedError(message);
+      }
+      throw new Error(message);
+    }
     const raw = await response.json();
     return this.unwrap<ImportResult>(raw);
   }
 
   async importEndpointsFromCurl(projectId: string, curl: string): Promise<ApiEndpoint> {
-    return this.requestWithAuth<ApiEndpoint>(`/projects/${projectId}/endpoints/import/curl`, {
+    return this.requestProtectedWithAuth<ApiEndpoint>(`/projects/${projectId}/endpoints/import/curl`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ curl }),
@@ -204,7 +254,7 @@ export class ApiClient {
   }
 
   async testEndpoint(projectId: string, endpointId: string, data: TestEndpointRequest): Promise<TestEndpointResponse> {
-    return this.requestWithAuth<TestEndpointResponse>(`/projects/${projectId}/endpoints/${endpointId}/test`, {
+    return this.requestProtectedWithAuth<TestEndpointResponse>(`/projects/${projectId}/endpoints/${endpointId}/test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -214,7 +264,7 @@ export class ApiClient {
   // ─── Test Runs ────────────────────────────────────────────────
 
   async startTestRun(projectId: string, data: StartTestRunRequest): Promise<TestRun> {
-    return this.requestWithAuth<TestRun>(`/projects/${projectId}/test-runs`, {
+    return this.requestProtectedWithAuth<TestRun>(`/projects/${projectId}/test-runs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -222,29 +272,25 @@ export class ApiClient {
   }
 
   async getTestRuns(projectId: string, _params?: { page?: number; limit?: number }): Promise<{ data: TestRun[] }> {
-    const result = await this.request<TestRun[] | { data: TestRun[] }>(`/projects/${projectId}/test-runs`);
+    const result = await this.requestProtected<TestRun[] | { data: TestRun[] }>(
+      `/projects/${projectId}/test-runs`,
+    );
     return Array.isArray(result) ? { data: result } : result;
   }
 
   async getTestRun(projectId: string, runId: string): Promise<TestRun> {
-    return this.request<TestRun>(`/projects/${projectId}/test-runs/${runId}`);
+    return this.requestProtected<TestRun>(`/projects/${projectId}/test-runs/${runId}`);
   }
 
   async getTestRunStatus(projectId: string, runId: string): Promise<StatusResponse> {
-    return this.request<StatusResponse>(`/projects/${projectId}/test-runs/${runId}/status`);
+    return this.requestProtected<StatusResponse>(`/projects/${projectId}/test-runs/${runId}/status`);
   }
 
   async downloadTestRunReport(projectId: string, runId: string, format: ReportFormat): Promise<Blob> {
     const headers: Record<string, string> = {};
     if (this.accessToken) headers['Authorization'] = `Bearer ${this.accessToken}`;
 
-    const response = await fetch(`${this.baseUrl}/projects/${projectId}/test-runs/${runId}/report/${format}`, {
-      credentials: 'include',
-      headers,
-    });
-
-    if (!response.ok) throw new Error(await this.extractErrorMessage(response));
-    return response.blob();
+    return this.requestProtectedBlob(`/projects/${projectId}/test-runs/${runId}/report/${format}`);
   }
 
   async updateTestRunVisibility(
@@ -252,7 +298,7 @@ export class ApiClient {
     runId: string,
     visibility: 'private' | 'public',
   ): Promise<{ visibility: string; shareToken: string | null; shareUrl: string | null }> {
-    return this.requestWithAuth<{ visibility: string; shareToken: string | null; shareUrl: string | null }>(
+    return this.requestProtectedWithAuth<{ visibility: string; shareToken: string | null; shareUrl: string | null }>(
       `/projects/${projectId}/test-runs/${runId}/visibility`,
       {
         method: 'PATCH',
@@ -292,15 +338,32 @@ export class ApiClient {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
     }
 
-    const response = await fetch(`${this.baseUrl}/analysis/preview-file`, {
+    let response = await fetch(`${this.baseUrl}/analysis/preview-file`, {
       method: 'POST',
       body: formData,
       credentials: 'include',
       headers,
     });
 
+    if (response.status === 401 && this.accessToken) {
+      const retryResponse = await this.retryAfterRefresh(`${this.baseUrl}/analysis/preview-file`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+        headers,
+      });
+      if (retryResponse) {
+        response = retryResponse;
+      }
+    }
+
     if (!response.ok) {
-      throw new Error(await this.extractErrorMessage(response));
+      const message = await this.extractErrorMessage(response);
+      if (response.status === 401) {
+        this.handleUnauthorized();
+        throw new ApiUnauthorizedError(message);
+      }
+      throw new Error(message);
     }
 
     const raw = await response.json();
@@ -324,12 +387,16 @@ export class ApiClient {
 
   async getStatus(analysisId: string, shareToken?: string | null): Promise<StatusResponse> {
     const qs = shareToken ? `?token=${encodeURIComponent(shareToken)}` : '';
-    return this.request<StatusResponse>(`/analysis/${analysisId}/status${qs}`);
+    return shareToken
+      ? this.request<StatusResponse>(`/analysis/${analysisId}/status${qs}`)
+      : this.requestProtected<StatusResponse>(`/analysis/${analysisId}/status${qs}`);
   }
 
   async getResults(analysisId: string, shareToken?: string | null): Promise<AnalysisReport> {
     const qs = shareToken ? `?token=${encodeURIComponent(shareToken)}` : '';
-    return this.request<AnalysisReport>(`/analysis/${analysisId}/results${qs}`);
+    return shareToken
+      ? this.request<AnalysisReport>(`/analysis/${analysisId}/results${qs}`)
+      : this.requestProtected<AnalysisReport>(`/analysis/${analysisId}/results${qs}`);
   }
 
   async getHistory(params?: {
@@ -349,7 +416,7 @@ export class ApiClient {
     if (params?.sortOrder) query.set('sortOrder', params.sortOrder);
 
     const qs = query.toString();
-    return this.request<PaginatedResponse<AnalysisHistoryItem>>(
+    return this.requestProtected<PaginatedResponse<AnalysisHistoryItem>>(
       `/analysis/history${qs ? `?${qs}` : ''}`,
     );
   }
@@ -360,33 +427,42 @@ export class ApiClient {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
     }
 
-    const response = await fetch(`${this.baseUrl}/analysis/${analysisId}/report/${format}`, {
-      credentials: 'include',
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error(await this.extractErrorMessage(response));
-    }
-
-    return response.blob();
+    return this.requestProtectedBlob(`/analysis/${analysisId}/report/${format}`);
   }
 
   // ─── Internal helpers ─────────────────────────────────────────────
 
-  private async request<T>(path: string): Promise<T> {
+  private async request<T>(
+    path: string,
+    options: { retryOnUnauthorized?: boolean; handleUnauthorized?: boolean } = {},
+  ): Promise<T> {
     const headers: Record<string, string> = {};
     if (this.accessToken) {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
     }
 
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    let response = await fetch(`${this.baseUrl}${path}`, {
       credentials: 'include',
       headers,
     });
 
+    if (response.status === 401 && options.retryOnUnauthorized && this.accessToken) {
+      const retryResponse = await this.retryAfterRefresh(`${this.baseUrl}${path}`, {
+        credentials: 'include',
+        headers,
+      });
+      if (retryResponse) {
+        response = retryResponse;
+      }
+    }
+
     if (!response.ok) {
-      throw new Error(await this.extractErrorMessage(response));
+      const message = await this.extractErrorMessage(response);
+      if (response.status === 401 && options.handleUnauthorized) {
+        this.handleUnauthorized();
+        throw new ApiUnauthorizedError(message);
+      }
+      throw new Error(message);
     }
 
     const raw = await response.json();
@@ -395,7 +471,11 @@ export class ApiClient {
     return this.unwrap<T>(raw);
   }
 
-  private async requestWithAuth<T>(path: string, init: RequestInit = {}): Promise<T> {
+  private async requestWithAuth<T>(
+    path: string,
+    init: RequestInit = {},
+    _options: { retryOnUnauthorized?: boolean; handleUnauthorized?: boolean } = {},
+  ): Promise<T> {
     const headers: Record<string, string> = {
       ...(init.headers as Record<string, string> | undefined),
     };
@@ -403,14 +483,14 @@ export class ApiClient {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
     }
 
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    let response = await fetch(`${this.baseUrl}${path}`, {
       ...init,
       credentials: 'include',
       headers,
     });
 
     // If 401, try refreshing the token once and retry
-    if (response.status === 401 && this.accessToken) {
+    if (response.status === 401 && options.retryOnUnauthorized && this.accessToken) {
       try {
         const refreshResult = await this.refreshToken();
         this.accessToken = refreshResult.accessToken;
@@ -444,6 +524,111 @@ export class ApiClient {
 
     const raw = JSON.parse(text);
     return this.unwrap<T>(raw);
+  }
+
+  private async requestProtected<T>(path: string): Promise<T> {
+    return this.request<T>(path, {
+      retryOnUnauthorized: true,
+      handleUnauthorized: true,
+    });
+  }
+
+  private async requestProtectedWithAuth<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const headers: Record<string, string> = {
+      ...(init.headers as Record<string, string> | undefined),
+    };
+    if (this.accessToken) {
+      headers['Authorization'] = `Bearer ${this.accessToken}`;
+    }
+
+    let response = await fetch(`${this.baseUrl}${path}`, {
+      ...init,
+      credentials: 'include',
+      headers,
+    });
+
+    if (response.status === 401 && this.accessToken) {
+      const retryResponse = await this.retryAfterRefresh(`${this.baseUrl}${path}`, {
+        ...init,
+        credentials: 'include',
+        headers,
+      });
+      if (retryResponse) {
+        response = retryResponse;
+      }
+    }
+
+    if (!response.ok) {
+      const message = await this.extractErrorMessage(response);
+      if (response.status === 401) {
+        this.handleUnauthorized();
+        throw new ApiUnauthorizedError(message);
+      }
+      throw new Error(message);
+    }
+
+    const text = await response.text();
+    if (!text) return undefined as T;
+
+    const raw = JSON.parse(text);
+    return this.unwrap<T>(raw);
+  }
+
+  private async requestProtectedBlob(path: string): Promise<Blob> {
+    const headers: Record<string, string> = {};
+    if (this.accessToken) {
+      headers['Authorization'] = `Bearer ${this.accessToken}`;
+    }
+
+    let response = await fetch(`${this.baseUrl}${path}`, {
+      credentials: 'include',
+      headers,
+    });
+
+    if (response.status === 401 && this.accessToken) {
+      const retryResponse = await this.retryAfterRefresh(`${this.baseUrl}${path}`, {
+        credentials: 'include',
+        headers,
+      });
+      if (retryResponse) {
+        response = retryResponse;
+      }
+    }
+
+    if (!response.ok) {
+      const message = await this.extractErrorMessage(response);
+      if (response.status === 401) {
+        this.handleUnauthorized();
+        throw new ApiUnauthorizedError(message);
+      }
+      throw new Error(message);
+    }
+
+    return response.blob();
+  }
+
+  private async retryAfterRefresh(url: string, init: RequestInit): Promise<Response | null> {
+    try {
+      const refreshResult = await this.refreshToken();
+      this.accessToken = refreshResult.accessToken;
+
+      const retryHeaders: Record<string, string> = {
+        ...((init.headers as Record<string, string> | undefined) ?? {}),
+        Authorization: `Bearer ${this.accessToken}`,
+      };
+
+      return await fetch(url, {
+        ...init,
+        credentials: 'include',
+        headers: retryHeaders,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  private handleUnauthorized(): void {
+    this.unauthorizedHandler?.();
   }
 
   /**

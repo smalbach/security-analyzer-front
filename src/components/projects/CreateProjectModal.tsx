@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { isUnauthorizedError } from '../../lib/api';
 import type { CreateProjectRequest, Project } from '../../types/api';
 import { Button, FormField, Input, Modal, Textarea } from '../ui';
 
@@ -23,6 +24,9 @@ export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalPro
       const project = await api.createProject(form);
       onCreated(project);
     } catch (submitError) {
+      if (isUnauthorizedError(submitError)) {
+        return;
+      }
       setError(submitError instanceof Error ? submitError.message : 'Failed to create project');
     } finally {
       setSubmitting(false);

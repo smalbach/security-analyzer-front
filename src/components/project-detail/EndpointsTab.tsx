@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { isUnauthorizedError } from '../../lib/api';
 import type { ApiEndpoint, Project } from '../../types/api';
 import { Button, EmptyState, Input } from '../ui';
 
@@ -154,7 +155,10 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
     try {
       const response = await api.getEndpoints(project.id);
       setEndpoints(response);
-    } catch {
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
       // Keep the current list if fetching fails.
     } finally {
       setLoading(false);
@@ -181,6 +185,9 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
       setImportFile(null);
       setShowImportPanel(false);
     } catch (error) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
       setImportError(error instanceof Error ? error.message : 'Import failed');
     } finally {
       setImporting(false);
@@ -200,6 +207,9 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
       setEndpoints((previous) => [...previous, endpoint]);
       setCurlInput('');
     } catch (error) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
       setImportError(error instanceof Error ? error.message : 'cURL import failed');
     } finally {
       setCurlImporting(false);
@@ -214,7 +224,10 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
     try {
       await api.deleteEndpoint(project.id, endpointId);
       setEndpoints((previous) => previous.filter((endpoint) => endpoint.id !== endpointId));
-    } catch {
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
       // Keep the list unchanged if deletion fails.
     }
   };
@@ -239,12 +252,11 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
     const directEndpointCount = node.endpoints.length;
 
     return (
-      <div key={node.id} className="space-y-2">
+      <div key={node.id} className="space-y-2" style={{ paddingLeft: `${level * 14}px` }}>
         <button
           type="button"
           onClick={() => toggleNode(node.id)}
-          className="group flex w-full items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition hover:border-tide-400/40 hover:bg-white/[0.06]"
-          style={{ marginLeft: `${level * 14}px` }}
+          className="group flex w-full min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition hover:border-tide-400/40 hover:bg-white/[0.06]"
         >
           <span className="inline-flex h-5 w-5 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-slate-300">
             {hasChildren || hasEndpoints ? (isExpanded ? '-' : '+') : ' '}
@@ -266,41 +278,39 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
         {isExpanded ? (
           <div className="space-y-2">
             {node.endpoints.map((endpoint) => (
-              <div
-                key={endpoint.id}
-                className="group flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 transition hover:border-tide-400/30"
-                style={{ marginLeft: `${(level + 1) * 14}px` }}
-              >
-                <span
-                  className={`shrink-0 rounded-md border px-2 py-0.5 font-mono text-xs font-bold ${
-                    METHOD_COLOR[endpoint.method] ?? 'border-white/10 bg-white/5 text-slate-400'
-                  }`}
-                >
-                  {endpoint.method}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/projects/${project.id}/endpoints/${endpoint.id}`)}
-                  className="min-w-0 flex-1 truncate text-left font-mono text-sm text-slate-200 hover:text-tide-300"
-                >
-                  {getDisplayPath(endpoint.path)}
-                </button>
-                {endpoint.description ? (
-                  <span className="hidden max-w-xs truncate text-xs text-slate-500 sm:block">
-                    {endpoint.description}
-                  </span>
-                ) : null}
-                <div className="hidden items-center gap-1.5 group-hover:flex">
-                  <Button
-                    variant="secondary"
-                    size="xs"
-                    onClick={() => navigate(`/projects/${project.id}/endpoints/${endpoint.id}`)}
+              <div key={endpoint.id} className="pl-[14px]">
+                <div className="group flex min-w-0 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 transition hover:border-tide-400/30">
+                  <span
+                    className={`shrink-0 rounded-md border px-2 py-0.5 font-mono text-xs font-bold ${
+                      METHOD_COLOR[endpoint.method] ?? 'border-white/10 bg-white/5 text-slate-400'
+                    }`}
                   >
-                    Edit
-                  </Button>
-                  <Button variant="danger" size="xs" onClick={() => void handleDelete(endpoint.id)}>
-                    Delete
-                  </Button>
+                    {endpoint.method}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/projects/${project.id}/endpoints/${endpoint.id}`)}
+                    className="min-w-0 flex-1 truncate text-left font-mono text-sm text-slate-200 hover:text-tide-300"
+                  >
+                    {getDisplayPath(endpoint.path)}
+                  </button>
+                  {endpoint.description ? (
+                    <span className="hidden max-w-xs truncate text-xs text-slate-500 sm:block">
+                      {endpoint.description}
+                    </span>
+                  ) : null}
+                  <div className="flex w-[116px] items-center justify-end gap-1.5 opacity-0 transition-opacity duration-150 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto">
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      onClick={() => navigate(`/projects/${project.id}/endpoints/${endpoint.id}`)}
+                    >
+                      Edit
+                    </Button>
+                    <Button variant="danger" size="xs" onClick={() => void handleDelete(endpoint.id)}>
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}

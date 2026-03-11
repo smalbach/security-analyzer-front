@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { isUnauthorizedError } from '../../lib/api';
 import { TEST_RUN_STATUS_BADGE, getTestRunDateLabel } from '../../lib/testRuns';
 import type { Project, TestRun } from '../../types/api';
 import { Button, EmptyState } from '../ui';
@@ -21,7 +22,10 @@ export function TestRunsTab({ project }: TestRunsTabProps) {
     try {
       const response = await api.getTestRuns(project.id, { limit: 20 });
       setRuns(response.data);
-    } catch {
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
       // Keep the current list if fetching fails.
     } finally {
       setLoading(false);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { CreateProjectModal, ProjectCard } from '../components/projects';
 import { Button, EmptyState } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
+import { isUnauthorizedError } from '../lib/api';
 import type { Project } from '../types/api';
 
 export function ProjectsPage() {
@@ -19,6 +20,9 @@ export function ProjectsPage() {
       const response = await api.getProjects({ limit: 50 });
       setProjects(response.data ?? []);
     } catch (loadError) {
+      if (isUnauthorizedError(loadError)) {
+        return;
+      }
       setError(loadError instanceof Error ? loadError.message : 'Failed to load projects');
     } finally {
       setLoading(false);
@@ -38,6 +42,9 @@ export function ProjectsPage() {
       await api.deleteProject(projectId);
       setProjects((previous) => previous.filter((project) => project.id !== projectId));
     } catch (deleteError) {
+      if (isUnauthorizedError(deleteError)) {
+        return;
+      }
       alert(deleteError instanceof Error ? deleteError.message : 'Failed to delete project');
     }
   };

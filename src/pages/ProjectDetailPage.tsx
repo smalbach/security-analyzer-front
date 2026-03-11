@@ -8,6 +8,7 @@ import {
 } from '../components/project-detail';
 import { TabBar } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
+import { isUnauthorizedError } from '../lib/api';
 import type { Project } from '../types/api';
 
 type Tab = 'endpoints' | 'test-runs' | 'settings';
@@ -47,9 +48,12 @@ export function ProjectDetailPage() {
 
     api.getProject(projectId)
       .then(setProject)
-      .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : 'Failed to load project'),
-      )
+      .catch((loadError) => {
+        if (isUnauthorizedError(loadError)) {
+          return;
+        }
+        setError(loadError instanceof Error ? loadError.message : 'Failed to load project');
+      })
       .finally(() => setLoading(false));
   }, [api, projectId]);
 
