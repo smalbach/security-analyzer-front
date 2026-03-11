@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiClient } from '../lib/api';
 import type { AnalysisHistoryItem, PaginatedResponse } from '../types/api';
@@ -29,6 +29,7 @@ export function AnalysisDashboard() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const previousDebouncedSearchRef = useRef(debouncedSearch);
 
   // Debounce search
   useEffect(() => {
@@ -56,13 +57,16 @@ export function AnalysisDashboard() {
   }, [client, page, debouncedSearch]);
 
   useEffect(() => {
-    void fetchHistory();
-  }, [fetchHistory]);
+    const searchChanged = previousDebouncedSearchRef.current !== debouncedSearch;
+    previousDebouncedSearchRef.current = debouncedSearch;
 
-  // Reset to page 1 when search changes
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch]);
+    if (searchChanged && page !== 1) {
+      setPage(1);
+      return;
+    }
+
+    void fetchHistory();
+  }, [debouncedSearch, fetchHistory, page]);
 
   const items = data?.data ?? [];
   const meta = data?.meta;

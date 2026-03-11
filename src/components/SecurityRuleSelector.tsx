@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { RuleSelection } from '../types/api';
+import { Button } from './ui';
 
 interface RuleConfig {
   key: keyof RuleSelection;
@@ -123,22 +124,18 @@ export function SecurityRuleSelector({ value, onChange, defaultCollapsed = false
           {/* Presets */}
           <div className="mb-4 flex flex-wrap gap-2">
             {PRESETS.map((p) => (
-              <button
+              <Button
                 key={p.label}
-                type="button"
+                variant="secondary"
+                size="xs"
                 onClick={() => applyPreset(p.keys)}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 transition hover:border-tide-400/40 hover:text-tide-300"
               >
                 {p.label}
-              </button>
+              </Button>
             ))}
-            <button
-              type="button"
-              onClick={() => applyPreset([])}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 transition hover:text-slate-200"
-            >
+            <Button variant="secondary" size="xs" onClick={() => applyPreset([])}>
               None
-            </button>
+            </Button>
           </div>
 
           {/* Rule groups */}
@@ -151,13 +148,9 @@ export function SecurityRuleSelector({ value, onChange, defaultCollapsed = false
                     <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                       {group.category}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => toggleCategory(group.rules)}
-                      className="text-xs text-tide-400 hover:text-tide-200"
-                    >
+                    <Button variant="link" size="xs" onClick={() => toggleCategory(group.rules)}>
                       {allOn ? 'Deselect all' : 'Select all'}
-                    </button>
+                    </Button>
                   </div>
                   <div className="space-y-1.5">
                     {group.rules.map((rule) => (

@@ -1,20 +1,11 @@
-import { useCallback, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ApiClient } from '../lib/api';
-import type {
-  AnalysisReport,
-  PreviewAndStartResponse,
-  ReportFormat,
-} from '../types/api';
-import { useAnalysisPolling } from '../hooks/useAnalysisPolling';
-import {
-  PreviewFileForm,
-  type PreviewFormValues,
-} from '../components/PreviewFileForm';
+import { useCallback, useMemo, useState } from 'react';
+import { AnalysisHero, AnalysisPreviewSection, AnalysisResultsSection } from '../components/analysis';
+import { PreviewFileForm, type PreviewFormValues } from '../components/PreviewFileForm';
 import { ProgressTracker } from '../components/ProgressTracker';
-import { ReportDownloads } from '../components/ReportDownloads';
-import { JsonReportView } from '../components/JsonReportView';
-import { PreviewGetEndpointsPanel } from '../components/PreviewGetEndpointsPanel';
+import { useAnalysisPolling } from '../hooks/useAnalysisPolling';
+import { ApiClient } from '../lib/api';
+import type { AnalysisReport, PreviewAndStartResponse, ReportFormat } from '../types/api';
 import { getPreviewGetEndpoints } from '../utils/preview-utils';
 
 const INITIAL_FORM: PreviewFormValues = {
@@ -45,9 +36,12 @@ export function AnalysisPage() {
   const client = useMemo(() => new ApiClient(formValues.apiBaseUrl), [formValues.apiBaseUrl]);
 
   const loadResults = useCallback(async () => {
-    if (!activeAnalysisId) return;
+    if (!activeAnalysisId) {
+      return;
+    }
 
     setIsFetchingResults(true);
+
     try {
       const nextReport = await client.getResults(activeAnalysisId);
       setReport(nextReport);
@@ -64,7 +58,9 @@ export function AnalysisPage() {
     analysisId: activeAnalysisId,
     enabled: shouldPoll,
     onStatus: (nextStatus) => {
-      if (nextStatus.summary && typeof nextStatus.summary === 'string') setInfo(nextStatus.summary);
+      if (nextStatus.summary && typeof nextStatus.summary === 'string') {
+        setInfo(nextStatus.summary);
+      }
     },
     onCompleted: () => {
       setShouldPoll(false);
@@ -72,7 +68,11 @@ export function AnalysisPage() {
     },
     onFailed: (nextStatus) => {
       setShouldPoll(false);
-      setError(nextStatus.error || (typeof nextStatus.summary === 'string' ? nextStatus.summary : undefined) || 'Analysis failed. Check backend logs.');
+      setError(
+        nextStatus.error ||
+          (typeof nextStatus.summary === 'string' ? nextStatus.summary : undefined) ||
+          'Analysis failed. Check backend logs.',
+      );
     },
     onError: (message) => {
       setShouldPoll(false);
@@ -85,23 +85,26 @@ export function AnalysisPage() {
     [previewStart],
   );
 
-  const getAnalysisLinks = useMemo(() => {
-    if (!activeAnalysisId) return null;
-    const base = formValues.apiBaseUrl.replace(/\/$/, '');
+  const analysisLinks = useMemo(() => {
+    if (!activeAnalysisId) {
+      return null;
+    }
+
+    const baseUrl = formValues.apiBaseUrl.replace(/\/$/, '');
     return {
-      status: `${base}/analysis/${activeAnalysisId}/status`,
-      results: `${base}/analysis/${activeAnalysisId}/results`,
-      reportJson: `${base}/analysis/${activeAnalysisId}/report/json`,
-      reportHtml: `${base}/analysis/${activeAnalysisId}/report/html`,
-      reportPdf: `${base}/analysis/${activeAnalysisId}/report/pdf`,
+      status: `${baseUrl}/analysis/${activeAnalysisId}/status`,
+      results: `${baseUrl}/analysis/${activeAnalysisId}/results`,
+      reportJson: `${baseUrl}/analysis/${activeAnalysisId}/report/json`,
+      reportHtml: `${baseUrl}/analysis/${activeAnalysisId}/report/html`,
+      reportPdf: `${baseUrl}/analysis/${activeAnalysisId}/report/pdf`,
     };
   }, [activeAnalysisId, formValues.apiBaseUrl]);
 
-  const onFormChange = (patch: Partial<PreviewFormValues>): void => {
+  const onFormChange = (patch: Partial<PreviewFormValues>) => {
     setFormValues((current) => ({ ...current, ...patch }));
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!selectedFile) {
@@ -152,7 +155,7 @@ export function AnalysisPage() {
     }
   };
 
-  const handleDownload = async (format: ReportFormat): Promise<void> => {
+  const handleDownload = async (format: ReportFormat) => {
     if (!activeAnalysisId) {
       setError('No analysisId available for downloading reports.');
       return;
@@ -181,15 +184,7 @@ export function AnalysisPage() {
 
   return (
     <div className="space-y-6">
-      <header className="animate-rise rounded-3xl border border-white/10 bg-white/5 p-6 shadow-glass backdrop-blur-xl">
-        <p className="font-mono text-xs uppercase tracking-[0.25em] text-tide-400">
-          API Security Analyzer
-        </p>
-        <h1 className="mt-2 text-3xl font-bold md:text-4xl">File-Based Security Analysis</h1>
-        <p className="mt-2 text-sm text-slate-200/85 md:text-base">
-          Upload a file to <code>POST /analysis/preview-file</code>, receive real-time updates via WebSocket, and view the final JSON report with filters.
-        </p>
-      </header>
+      <AnalysisHero />
 
       {error ? (
         <div className="rounded-xl border border-red-300/40 bg-red-500/15 px-4 py-3 text-sm text-red-100">
@@ -213,65 +208,11 @@ export function AnalysisPage() {
       />
 
       {previewStart ? (
-        <section className="rounded-3xl border border-white/10 bg-slatewave-900/75 p-5 shadow-glass backdrop-blur-xl md:p-6">
-          <h2 className="text-xl font-semibold">Initial Preview</h2>
-
-          <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm">
-            <p>
-              <strong>analysisId:</strong> {previewStart.analysisId}
-            </p>
-            <p className="mt-1">
-              <strong>baseUrl:</strong> {previewStart.preview.baseUrl}
-            </p>
-            <p className="mt-1">
-              <strong>sections:</strong>{' '}
-              {previewStart.preview.sections.length ? previewStart.preview.sections.join(' | ') : '-'}
-            </p>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <Metric label="Total endpoints" value={previewStart.preview.totalEndpoints} />
-            <Metric label="Total users" value={previewStart.preview.totalUsers} />
-            <Metric label="GET methods (preview)" value={previewGetEndpoints.length} />
-          </div>
-
-          {getAnalysisLinks ? (
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm">
-              <h3 className="font-semibold">Query endpoints</h3>
-              <ul className="mt-2 space-y-1 break-all text-slate-200">
-                <li>
-                  <a className="text-tide-300 hover:underline" href={getAnalysisLinks.status} target="_blank" rel="noreferrer">
-                    status
-                  </a>
-                </li>
-                <li>
-                  <a className="text-tide-300 hover:underline" href={getAnalysisLinks.results} target="_blank" rel="noreferrer">
-                    results
-                  </a>
-                </li>
-                <li>
-                  <a className="text-tide-300 hover:underline" href={getAnalysisLinks.reportJson} target="_blank" rel="noreferrer">
-                    report json
-                  </a>
-                </li>
-                <li>
-                  <a className="text-tide-300 hover:underline" href={getAnalysisLinks.reportHtml} target="_blank" rel="noreferrer">
-                    report html
-                  </a>
-                </li>
-                <li>
-                  <a className="text-tide-300 hover:underline" href={getAnalysisLinks.reportPdf} target="_blank" rel="noreferrer">
-                    report pdf
-                  </a>
-                </li>
-              </ul>
-            </div>
-          ) : null}
-
-          {previewGetEndpoints.length > 0 ? (
-            <PreviewGetEndpointsPanel endpoints={previewGetEndpoints} />
-          ) : null}
-        </section>
+        <AnalysisPreviewSection
+          previewStart={previewStart}
+          previewGetEndpoints={previewGetEndpoints}
+          analysisLinks={analysisLinks}
+        />
       ) : null}
 
       {activeAnalysisId ? (
@@ -284,36 +225,14 @@ export function AnalysisPage() {
       ) : null}
 
       {polling.status?.status === 'completed' ? (
-        <section className="space-y-6">
-          <ReportDownloads
-            analysisId={activeAnalysisId}
-            downloadingFormat={downloadingFormat}
-            onDownload={(format) => void handleDownload(format)}
-          />
-
-          {isFetchingResults ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">
-              Loading JSON report...
-            </div>
-          ) : null}
-
-          {report ? <JsonReportView report={report} /> : null}
-        </section>
+        <AnalysisResultsSection
+          analysisId={activeAnalysisId}
+          downloadingFormat={downloadingFormat}
+          isFetchingResults={isFetchingResults}
+          report={report}
+          onDownload={(format) => void handleDownload(format)}
+        />
       ) : null}
-    </div>
-  );
-}
-
-type MetricProps = {
-  label: string;
-  value: number;
-};
-
-function Metric({ label, value }: MetricProps) {
-  return (
-    <div className="metric-card">
-      <p className="metric-label">{label}</p>
-      <p className="metric-value">{value}</p>
     </div>
   );
 }
