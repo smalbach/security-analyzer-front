@@ -13,12 +13,14 @@ type UseAnalysisPollingArgs = {
   baseUrl: string;
   analysisId: string;
   enabled: boolean;
+  token?: string;
 } & SocketCallbacks;
 
 export function useAnalysisPolling({
   baseUrl,
   analysisId,
   enabled,
+  token,
   onStatus,
   onCompleted,
   onFailed,
@@ -47,6 +49,7 @@ export function useAnalysisPolling({
 
     const socket = io(`${socketServerUrl}/analysis`, {
       query: { analysisId },
+      auth: token ? { token } : undefined,
     });
 
     socket.on('progress', (data: StatusResponse) => {

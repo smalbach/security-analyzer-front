@@ -36,7 +36,7 @@ export function ProgressTracker({
   const detail =
     typeof status?.progress === 'string'
       ? status.progress
-      : progress?.detail || status?.summary || 'No progress details available';
+      : progress?.detail || (typeof status?.summary === 'string' ? status.summary : undefined) || 'No progress details available';
 
   const endpointsInfo =
     progress &&
@@ -96,7 +96,7 @@ export function ProgressTracker({
         {currentStepLabel ? <span className="badge">{currentStepLabel}</span> : null}
       </div>
 
-      {status?.summary ? (
+      {status?.summary && typeof status.summary === 'string' ? (
         <p className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-200">
           {status.summary}
         </p>

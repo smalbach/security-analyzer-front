@@ -18,7 +18,7 @@ import { PreviewGetEndpointsPanel } from '../components/PreviewGetEndpointsPanel
 import { getPreviewGetEndpoints } from '../utils/preview-utils';
 
 const INITIAL_FORM: PreviewFormValues = {
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api/v1',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? '/api/v1',
   baseUrlOverride: '',
   projectName: '',
   crossUserPermutations: true,
@@ -64,7 +64,7 @@ export function AnalysisPage() {
     analysisId: activeAnalysisId,
     enabled: shouldPoll,
     onStatus: (nextStatus) => {
-      if (nextStatus.summary) setInfo(nextStatus.summary);
+      if (nextStatus.summary && typeof nextStatus.summary === 'string') setInfo(nextStatus.summary);
     },
     onCompleted: () => {
       setShouldPoll(false);
@@ -72,7 +72,7 @@ export function AnalysisPage() {
     },
     onFailed: (nextStatus) => {
       setShouldPoll(false);
-      setError(nextStatus.error || nextStatus.summary || 'Analysis failed. Check backend logs.');
+      setError(nextStatus.error || (typeof nextStatus.summary === 'string' ? nextStatus.summary : undefined) || 'Analysis failed. Check backend logs.');
     },
     onError: (message) => {
       setShouldPoll(false);

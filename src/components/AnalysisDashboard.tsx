@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ApiClient } from '../lib/api';
 import type { AnalysisHistoryItem, PaginatedResponse } from '../types/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-amber-500/20 text-amber-100 border-amber-300/40',

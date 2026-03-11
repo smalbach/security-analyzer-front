@@ -1,35 +1,46 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ApiClient } from '../lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import type { AnalysisReport, ReportFormat } from '../types/api';
 import { ReportDownloads } from '../components/ReportDownloads';
 import { JsonReportView } from '../components/JsonReportView';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api/v1';
-
 export function ReportPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const client = useMemo(() => new ApiClient(API_BASE_URL), []);
+  const { api, user } = useAuth();
+
+  const shareToken = searchParams.get('token');
 
   const [report, setReport] = useState<AnalysisReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [downloadingFormat, setDownloadingFormat] = useState<ReportFormat | null>(null);
 
+  // Sharing state
+  const [visibility, setVisibility] = useState<'private' | 'public'>('private');
+  const [currentShareToken, setCurrentShareToken] = useState<string | null>(null);
+  const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const isOwner = user && report?.userId && user.id === report.userId;
+
   const loadReport = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     setError('');
     try {
-      const result = await client.getResults(id);
+      const result = await api.getResults(id, shareToken);
       setReport(result);
+      setVisibility(result.visibility ?? 'private');
+      setCurrentShareToken(result.shareToken ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load report');
     } finally {
       setLoading(false);
     }
-  }, [id, client]);
+  }, [id, api, shareToken]);
 
   useEffect(() => {
     void loadReport();
@@ -41,7 +52,7 @@ export function ReportPage() {
     setError('');
 
     try {
-      const blob = await client.downloadReport(id, format);
+      const blob = await api.downloadReport(id, format);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -55,6 +66,30 @@ export function ReportPage() {
     } finally {
       setDownloadingFormat(null);
     }
+  };
+
+  const handleToggleVisibility = async () => {
+    if (!id) return;
+    setIsTogglingVisibility(true);
+    try {
+      const newVisibility = visibility === 'private' ? 'public' : 'private';
+      const result = await api.updateVisibility(id, newVisibility);
+      setVisibility(result.visibility as 'private' | 'public');
+      setCurrentShareToken(result.shareToken);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update visibility');
+    } finally {
+      setIsTogglingVisibility(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (!currentShareToken || !id) return;
+    const shareUrl = `${window.location.origin}/analysis/${id}?token=${currentShareToken}`;
+    void navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   if (loading) {
@@ -145,6 +180,35 @@ export function ReportPage() {
             <p className="metric-value text-teal-300">{report.lowCount}</p>
           </div>
         </div>
+
+        {/* Sharing controls (owner only) */}
+        {isOwner && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">
+            <span className="text-sm text-slate-400">Visibility:</span>
+            <button
+              type="button"
+              onClick={() => void handleToggleVisibility()}
+              disabled={isTogglingVisibility}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                visibility === 'public'
+                  ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              {isTogglingVisibility ? 'Updating...' : visibility === 'public' ? 'Public' : 'Private'}
+            </button>
+
+            {visibility === 'public' && currentShareToken && (
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="rounded-lg bg-tide-500/20 px-3 py-1.5 text-sm font-medium text-tide-300 transition-colors hover:bg-tide-500/30"
+              >
+                {copied ? 'Copied!' : 'Copy Link'}
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
       <ReportDownloads
