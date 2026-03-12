@@ -8,7 +8,14 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/';
+  const redirectTarget = (location.state as {
+    from?: string | { pathname?: string; search?: string; hash?: string };
+  } | null)?.from;
+  const from = typeof redirectTarget === 'string'
+    ? redirectTarget
+    : redirectTarget?.pathname
+      ? `${redirectTarget.pathname}${redirectTarget.search ?? ''}${redirectTarget.hash ?? ''}`
+      : '/';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

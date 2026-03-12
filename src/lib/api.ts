@@ -264,11 +264,30 @@ export class ApiClient {
   // ─── Test Runs ────────────────────────────────────────────────
 
   async startTestRun(projectId: string, data: StartTestRunRequest): Promise<TestRun> {
-    return this.requestProtectedWithAuth<TestRun>(`/projects/${projectId}/test-runs`, {
+    const result = await this.requestProtectedWithAuth<
+      TestRun | { id?: string; runId?: string; testRunId?: string }
+    >(`/projects/${projectId}/test-runs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+
+    if (result && typeof result === 'object' && 'id' in result && typeof result.id === 'string') {
+      return result as TestRun;
+    }
+
+    const record = result && typeof result === 'object' ? (result as Record<string, unknown>) : null;
+    const identifier =
+      (typeof record?.runId === 'string' && record.runId) ||
+      (typeof record?.testRunId === 'string' && record.testRunId) ||
+      (typeof record?.id === 'string' && record.id) ||
+      undefined;
+
+    if (typeof identifier === 'string' && identifier.length > 0) {
+      return this.getTestRun(projectId, identifier);
+    }
+
+    throw new Error('API did not return a valid test run identifier.');
   }
 
   async getTestRuns(projectId: string, _params?: { page?: number; limit?: number }): Promise<{ data: TestRun[] }> {
@@ -474,7 +493,7 @@ export class ApiClient {
   private async requestWithAuth<T>(
     path: string,
     init: RequestInit = {},
-    _options: { retryOnUnauthorized?: boolean; handleUnauthorized?: boolean } = {},
+    options: { retryOnUnauthorized?: boolean; handleUnauthorized?: boolean } = {},
   ): Promise<T> {
     const headers: Record<string, string> = {
       ...(init.headers as Record<string, string> | undefined),

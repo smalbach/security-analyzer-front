@@ -82,6 +82,9 @@ export function TestRunsTab({ project }: TestRunsTabProps) {
           project={project}
           onClose={() => setShowStartModal(false)}
           onStarted={(run) => {
+            if (!run?.id) {
+              return;
+            }
             setRuns((previous) => [run, ...previous]);
             setShowStartModal(false);
             navigate(`/projects/${project.id}/test-runs/${run.id}`);

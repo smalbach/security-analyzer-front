@@ -68,6 +68,10 @@ export function StartTestRunModal({
         rules,
       };
       const run = await api.startTestRun(project.id, payload);
+      if (!run?.id) {
+        setError('The test run started but no run id was returned yet. Please try again in a few seconds.');
+        return;
+      }
       onStarted(run);
     } catch (submitError) {
       if (isUnauthorizedError(submitError)) {

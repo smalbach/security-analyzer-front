@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { AuthUser } from '../types/api';
 import { ApiClient } from '../lib/api';
 
@@ -6,6 +7,7 @@ interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isRedirectingToLogin: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -15,6 +17,7 @@ interface AuthContextType {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
 const TOKEN_KEY = 'asa_access_token';
 const TOKEN_EXPIRY_KEY = 'asa_token_expiry';
+const AUTH_ROUTES = new Set(['/login', '/register', '/forgot-password', '/reset-password']);
 
 /** Decode JWT and return expiry timestamp in ms, or null if unreadable. */
 function getTokenExpiry(token: string): number | null {
@@ -50,21 +53,53 @@ function isStoredTokenValid(): boolean {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRedirectingToLogin, setIsRedirectingToLogin] = useState(false);
+  const redirectingRef = useRef(false);
   const api = useMemo(() => new ApiClient(API_BASE_URL), []);
 
-  useEffect(() => {
-    api.setUnauthorizedHandler(() => {
-      clearToken(api);
-      setUser(null);
-      setIsLoading(false);
+  const handleUnauthorized = useCallback(() => {
+    if (redirectingRef.current) {
+      return;
+    }
+
+    clearToken(api);
+    setUser(null);
+    setIsLoading(false);
+
+    const currentPath = window.location.pathname;
+    if (AUTH_ROUTES.has(currentPath)) {
+      redirectingRef.current = false;
+      setIsRedirectingToLogin(false);
+      return;
+    }
+
+    redirectingRef.current = true;
+    setIsRedirectingToLogin(true);
+    const from = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    navigate('/login', {
+      replace: true,
+      state: { from },
     });
+  }, [api, navigate]);
+
+  useEffect(() => {
+    api.setUnauthorizedHandler(handleUnauthorized);
 
     return () => {
       api.setUnauthorizedHandler(null);
     };
-  }, [api]);
+  }, [api, handleUnauthorized]);
+
+  useEffect(() => {
+    if (location.pathname === '/login') {
+      redirectingRef.current = false;
+      setIsRedirectingToLogin(false);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -99,18 +134,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.login(email, password);
     saveToken(res.accessToken, api);
+    redirectingRef.current = false;
+    setIsRedirectingToLogin(false);
     setUser(res.user);
   }, [api]);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
     const res = await api.register(name, email, password);
     saveToken(res.accessToken, api);
+    redirectingRef.current = false;
+    setIsRedirectingToLogin(false);
     setUser(res.user);
   }, [api]);
 
   const logout = useCallback(async () => {
     try { await api.logout(); } catch { /* ignore */ }
     clearToken(api);
+    redirectingRef.current = false;
+    setIsRedirectingToLogin(false);
     setUser(null);
   }, [api]);
 
@@ -118,11 +159,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     isAuthenticated: !!user,
     isLoading,
+    isRedirectingToLogin,
     login,
     register,
     logout,
     api,
-  }), [user, isLoading, login, register, logout, api]);
+  }), [user, isLoading, isRedirectingToLogin, login, register, logout, api]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

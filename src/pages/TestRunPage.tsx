@@ -1,7 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { EndpointResultCard, TestRunAiAnalysis, TestRunSummaryGrid } from '../components/test-run';
-import { Button, LinkButton } from '../components/ui';
+import {
+  EndpointResultCard,
+  INITIAL_TEST_RUN_FILTERS,
+  TestRunAiAnalysis,
+  TestRunFilters,
+  TestRunSummaryGrid,
+  applyTestRunFilters,
+  getTestRunFilterOptions,
+  hasActiveTestRunFilters,
+  sanitizeTestRunFilters,
+  summarizeFilteredTestRunResults,
+  type TestRunFilterState,
+} from '../components/test-run';
+import { Button, EmptyState, LinkButton } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { isUnauthorizedError } from '../lib/api';
 import { TEST_RUN_STATUS_BADGE } from '../lib/testRuns';
@@ -14,6 +26,7 @@ export function TestRunPage() {
   const [run, setRun] = useState<TestRun | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filters, setFilters] = useState<TestRunFilterState>(INITIAL_TEST_RUN_FILTERS);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = () => {
@@ -75,6 +88,35 @@ export function TestRunPage() {
       alert(downloadError instanceof Error ? downloadError.message : 'Download failed');
     }
   };
+  const summary = run?.summary;
+  const aiAnalysis = run?.aiAnalysis;
+  const endpointResults = useMemo(
+    () => (run?.endpointResults ?? []) as EndpointTestResult[],
+    [run],
+  );
+  const filteredEndpointResults = useMemo(
+    () => applyTestRunFilters(endpointResults, filters),
+    [endpointResults, filters],
+  );
+  const filterOptions = useMemo(
+    () => getTestRunFilterOptions(endpointResults, filters),
+    [endpointResults, filters],
+  );
+  const filterSummary = useMemo(
+    () => summarizeFilteredTestRunResults(filteredEndpointResults, endpointResults),
+    [filteredEndpointResults, endpointResults],
+  );
+  const hasActiveFilters = useMemo(
+    () => hasActiveTestRunFilters(filters),
+    [filters],
+  );
+
+  useEffect(() => {
+    setFilters((currentFilters) => {
+      const sanitizedFilters = sanitizeTestRunFilters(currentFilters, filterOptions);
+      return areSameFilters(currentFilters, sanitizedFilters) ? currentFilters : sanitizedFilters;
+    });
+  }, [filterOptions]);
 
   if (loading) {
     return <div className="py-20 text-center text-slate-500">Loading test run...</div>;
@@ -87,10 +129,6 @@ export function TestRunPage() {
   if (!run) {
     return null;
   }
-
-  const summary = run.summary;
-  const aiAnalysis = run.aiAnalysis;
-  const endpointResults = (run.endpointResults ?? []) as EndpointTestResult[];
 
   return (
     <div className="space-y-6">
@@ -160,10 +198,36 @@ export function TestRunPage() {
 
       {endpointResults.length ? (
         <div className="space-y-3">
-          <h2 className="font-semibold text-slate-200">Endpoint Results</h2>
-          {endpointResults.map((result, index) => (
-            <EndpointResultCard key={`${result.url}-${index}`} result={result} />
-          ))}
+          <TestRunFilters
+            filters={filters}
+            options={filterOptions}
+            summary={filterSummary}
+            hasActiveFilters={hasActiveFilters}
+            onChange={(patch) => setFilters((current) => ({ ...current, ...patch }))}
+            onReset={() => setFilters(INITIAL_TEST_RUN_FILTERS)}
+          />
+
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold text-slate-200">Endpoint Results</h2>
+            <p className="text-sm text-slate-500">{filteredEndpointResults.length} visible</p>
+          </div>
+
+          {filteredEndpointResults.length ? (
+            filteredEndpointResults.map((result, index) => (
+              <EndpointResultCard key={`${result.url}-${index}`} result={result} />
+            ))
+          ) : (
+            <EmptyState
+              title="No endpoint results match the current filters"
+              description="Adjust one or more selectors to broaden the visible results."
+              action={hasActiveFilters ? (
+                <Button variant="secondary" size="sm" onClick={() => setFilters(INITIAL_TEST_RUN_FILTERS)}>
+                  Reset filters
+                </Button>
+              ) : undefined}
+              className="bg-white/5"
+            />
+          )}
         </div>
       ) : null}
 
@@ -175,4 +239,18 @@ export function TestRunPage() {
       ) : null}
     </div>
   );
+}
+
+function areSameFilters(left: TestRunFilterState, right: TestRunFilterState): boolean {
+  return left.method === right.method
+    && left.endpointId === right.endpointId
+    && left.resultState === right.resultState
+    && left.severity === right.severity
+    && left.category === right.category
+    && left.ruleId === right.ruleId
+    && left.checkStatus === right.checkStatus
+    && left.httpStatusFamily === right.httpStatusFamily
+    && left.httpStatus === right.httpStatus
+    && left.testType === right.testType
+    && left.sortBy === right.sortBy;
 }

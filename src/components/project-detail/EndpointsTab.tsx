@@ -279,7 +279,10 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
           <div className="space-y-2">
             {node.endpoints.map((endpoint) => (
               <div key={endpoint.id} className="pl-[14px]">
-                <div className="group flex min-w-0 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 transition hover:border-tide-400/30">
+                <div className="group flex min-w-0 items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-4 py-3 transition hover:border-emerald-400/40 hover:bg-emerald-500/[0.12]">
+                  <span className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
+                    Endpoint
+                  </span>
                   <span
                     className={`shrink-0 rounded-md border px-2 py-0.5 font-mono text-xs font-bold ${
                       METHOD_COLOR[endpoint.method] ?? 'border-white/10 bg-white/5 text-slate-400'

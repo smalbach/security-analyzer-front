@@ -12,6 +12,7 @@ interface CreateProjectModalProps {
 export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalProps) {
   const { api } = useAuth();
   const [form, setForm] = useState<CreateProjectRequest>({ name: '' });
+  const [tagsInput, setTagsInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -21,7 +22,17 @@ export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalPro
     setError('');
 
     try {
-      const project = await api.createProject(form);
+      const parsedTags = tagsInput
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+
+      const payload: CreateProjectRequest = {
+        ...form,
+        tags: parsedTags.length > 0 ? parsedTags : undefined,
+      };
+
+      const project = await api.createProject(payload);
       onCreated(project);
     } catch (submitError) {
       if (isUnauthorizedError(submitError)) {
@@ -90,16 +101,8 @@ export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalPro
         <FormField label="Tags (comma separated)" htmlFor="create-project-tags">
           <Input
             id="create-project-tags"
-            value={form.tags?.join(', ') ?? ''}
-            onChange={(event) =>
-              setForm({
-                ...form,
-                tags: event.target.value
-                  .split(',')
-                  .map((tag) => tag.trim())
-                  .filter(Boolean),
-              })
-            }
+            value={tagsInput}
+            onChange={(event) => setTagsInput(event.target.value)}
             placeholder="production, v2, internal"
           />
         </FormField>
