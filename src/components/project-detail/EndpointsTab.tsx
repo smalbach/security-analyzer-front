@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { isUnauthorizedError } from '../../lib/api';
+import {
+  VERSION_PREFIX_REGEX,
+  buildEndpointTree,
+  countNodeEndpoints,
+  getAllEndpointIds,
+  getDisplayPath,
+} from '../../lib/endpointTree';
+import type { EndpointTreeNode } from '../../lib/endpointTree';
+import { useEndpointSelectionStore } from '../../stores/endpointSelectionStore';
 import type { ApiEndpoint, Project } from '../../types/api';
 import { Button, EmptyState, Input } from '../ui';
 
@@ -19,123 +28,33 @@ interface EndpointsTabProps {
   project: Project;
 }
 
-interface EndpointTreeNode {
-  id: string;
-  label: string;
-  fullPath: string;
-  children: EndpointTreeNode[];
-  endpoints: ApiEndpoint[];
+// ─── Indeterminate checkbox helper ──────────────────────────────────────────
+interface GroupCheckboxProps {
+  ids: string[];
+  onToggle: (ids: string[], forceSelect: boolean) => void;
 }
 
-const VERSION_PREFIX_REGEX = /^v\d+$/i;
+function GroupCheckbox({ ids, onToggle }: GroupCheckboxProps) {
+  const ref = useRef<HTMLInputElement>(null);
+  const state = useEndpointSelectionStore((s) => s.selectionState(ids));
 
-function decodePathSegment(segment: string): string {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return segment;
-  }
-}
-
-function normalizePathSegments(rawPath: string): string[] {
-  return rawPath
-    .split('/')
-    .map((segment) => segment.trim())
-    .filter(Boolean)
-    .map((segment) => decodePathSegment(segment));
-}
-
-function getPathTreeSegments(endpointPath: string): string[] {
-  const segments = normalizePathSegments(endpointPath);
-
-  if (segments.length === 0) {
-    return ['(root)'];
-  }
-
-  if (segments.length >= 2 && VERSION_PREFIX_REGEX.test(segments[0])) {
-    const [, resource, ...rest] = segments;
-    return [resource, segments[0].toLowerCase(), ...rest];
-  }
-
-  return segments;
-}
-
-function getDisplayPath(endpointPath: string): string {
-  const segments = normalizePathSegments(endpointPath);
-  if (segments.length === 0) {
-    return '/';
-  }
-
-  return `/${segments.join('/')}`;
-}
-
-function buildEndpointTree(endpoints: ApiEndpoint[]): EndpointTreeNode[] {
-  type MutableNode = {
-    id: string;
-    label: string;
-    fullPath: string;
-    children: Map<string, MutableNode>;
-    endpoints: ApiEndpoint[];
-  };
-
-  const root = new Map<string, MutableNode>();
-
-  for (const endpoint of endpoints) {
-    const treeSegments = getPathTreeSegments(endpoint.path);
-
-    let parent = root;
-    let currentPath = '';
-    let currentNode: MutableNode | null = null;
-
-    for (let index = 0; index < treeSegments.length; index += 1) {
-      const segment = treeSegments[index];
-      currentPath = currentPath ? `${currentPath}/${segment}` : segment;
-      const key = `${index}:${segment}`;
-      const existing = parent.get(key);
-
-      if (existing) {
-        currentNode = existing;
-        parent = existing.children;
-        continue;
-      }
-
-      const created: MutableNode = {
-        id: currentPath,
-        label: segment,
-        fullPath: currentPath,
-        children: new Map<string, MutableNode>(),
-        endpoints: [],
-      };
-
-      parent.set(key, created);
-      currentNode = created;
-      parent = created.children;
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.indeterminate = state === 'partial';
     }
+  }, [state]);
 
-    if (currentNode) {
-      currentNode.endpoints.push(endpoint);
-    }
-  }
-
-  const toImmutable = (nodes: Map<string, MutableNode>): EndpointTreeNode[] =>
-    Array.from(nodes.values())
-      .map((node) => ({
-        id: node.id,
-        label: node.label,
-        fullPath: node.fullPath,
-        children: toImmutable(node.children),
-        endpoints: [...node.endpoints].sort((a, b) => {
-          const methodCompare = a.method.localeCompare(b.method);
-          return methodCompare !== 0 ? methodCompare : a.path.localeCompare(b.path);
-        }),
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-
-  return toImmutable(root);
-}
-
-function countNodeEndpoints(node: EndpointTreeNode): number {
-  return node.endpoints.length + node.children.reduce((total, child) => total + countNodeEndpoints(child), 0);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={state === 'all'}
+      onChange={() => onToggle(ids, state !== 'all')}
+      onClick={(e) => e.stopPropagation()}
+      className="h-4 w-4 shrink-0 cursor-pointer rounded border-white/20 accent-tide-400"
+      aria-label="Select group"
+    />
+  );
 }
 
 export function EndpointsTab({ project }: EndpointsTabProps) {
@@ -151,10 +70,23 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
   const [showImportPanel, setShowImportPanel] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
+  // ─── Selection store ───────────────────────────────────────────────────────
+  const {
+    selectedIds,
+    setProject,
+    toggle,
+    toggleGroup,
+    selectAll,
+    clearAll,
+    isSelected,
+  } = useEndpointSelectionStore();
+
   const fetchEndpoints = useCallback(async () => {
     try {
       const response = await api.getEndpoints(project.id);
       setEndpoints(response);
+      // Register the project in the selection store (resets selection if project changed).
+      setProject(project.id, response.map((ep) => ep.id));
     } catch (error) {
       if (isUnauthorizedError(error)) {
         return;
@@ -163,13 +95,16 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [api, project.id]);
+  }, [api, project.id, setProject]);
 
   useEffect(() => {
     void fetchEndpoints();
   }, [fetchEndpoints]);
 
   const endpointTree = useMemo(() => buildEndpointTree(endpoints), [endpoints]);
+
+  // All top-level IDs for the "select all" shortcut in the header bar
+  const allEndpointIds = useMemo(() => endpoints.map((ep) => ep.id), [endpoints]);
 
   const handleImportFile = async () => {
     if (!importFile) {
@@ -250,36 +185,58 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
     const isExpanded = expandedNodes.has(node.id);
     const endpointCount = countNodeEndpoints(node);
     const directEndpointCount = node.endpoints.length;
+    const nodeEndpointIds = getAllEndpointIds(node);
 
     return (
       <div key={node.id} className="space-y-2" style={{ paddingLeft: `${level * 14}px` }}>
-        <button
-          type="button"
-          onClick={() => toggleNode(node.id)}
-          className="group flex w-full min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition hover:border-tide-400/40 hover:bg-white/[0.06]"
-        >
-          <span className="inline-flex h-5 w-5 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-slate-300">
-            {hasChildren || hasEndpoints ? (isExpanded ? '-' : '+') : ' '}
-          </span>
-          <span className="truncate font-mono text-sm text-slate-100">{node.label}</span>
-          {VERSION_PREFIX_REGEX.test(node.label) ? (
-            <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-300">
-              Version
+        <div className="group flex w-full min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 transition hover:border-tide-400/40 hover:bg-white/[0.06]">
+          {/* Group checkbox */}
+          <GroupCheckbox ids={nodeEndpointIds} onToggle={toggleGroup} />
+
+          {/* Expand / collapse button */}
+          <button
+            type="button"
+            onClick={() => toggleNode(node.id)}
+            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          >
+            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-slate-300">
+              {hasChildren || hasEndpoints ? (isExpanded ? '-' : '+') : ' '}
             </span>
-          ) : null}
-          <span className="ml-auto hidden text-[11px] text-slate-400 sm:block">
-            {directEndpointCount} directos | {endpointCount} total
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
-            {endpointCount}
-          </span>
-        </button>
+            <span className="truncate font-mono text-sm text-slate-100">{node.label}</span>
+            {VERSION_PREFIX_REGEX.test(node.label) ? (
+              <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-300">
+                Version
+              </span>
+            ) : null}
+            <span className="ml-auto hidden text-[11px] text-slate-400 sm:block">
+              {directEndpointCount} directos | {endpointCount} total
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
+              {endpointCount}
+            </span>
+          </button>
+        </div>
 
         {isExpanded ? (
           <div className="space-y-2">
             {node.endpoints.map((endpoint) => (
               <div key={endpoint.id} className="pl-[14px]">
-                <div className="group flex min-w-0 items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-4 py-3 transition hover:border-emerald-400/40 hover:bg-emerald-500/[0.12]">
+                <div
+                  className={`group flex min-w-0 items-center gap-3 rounded-xl border px-4 py-3 transition ${
+                    isSelected(endpoint.id)
+                      ? 'border-tide-400/40 bg-tide-500/[0.10]'
+                      : 'border-emerald-500/20 bg-emerald-500/[0.07] hover:border-emerald-400/40 hover:bg-emerald-500/[0.12]'
+                  }`}
+                >
+                  {/* Individual endpoint checkbox */}
+                  <input
+                    type="checkbox"
+                    checked={isSelected(endpoint.id)}
+                    onChange={() => toggle(endpoint.id)}
+                    className="h-4 w-4 shrink-0 cursor-pointer rounded border-white/20 accent-tide-400"
+                    aria-label={`Select ${endpoint.method} ${endpoint.path}`}
+                  />
+
                   <span className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
                     Endpoint
                   </span>
@@ -380,15 +337,40 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
         />
       ) : (
         <div className="space-y-3">
+          {/* ── Header bar with totals + selection controls ── */}
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-gradient-to-r from-white/10 via-white/5 to-transparent px-4 py-3">
             <div>
               <p className="text-xs uppercase tracking-widest text-slate-400">Endpoint explorer</p>
               <p className="text-sm text-slate-200">Rutas agrupadas por recurso y version.</p>
             </div>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
-              {endpoints.length} endpoints
-            </span>
+            <div className="flex items-center gap-2">
+              {selectedIds.size > 0 ? (
+                <>
+                  <span className="rounded-full border border-tide-400/30 bg-tide-500/10 px-3 py-1 text-xs font-semibold text-tide-300">
+                    {selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearAll}
+                    className="text-xs text-slate-400 transition hover:text-white"
+                  >
+                    Limpiar
+                  </button>
+                </>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => selectAll(allEndpointIds)}
+                className="text-xs text-slate-400 transition hover:text-slate-200"
+              >
+                Seleccionar todos
+              </button>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
+                {endpoints.length} endpoints
+              </span>
+            </div>
           </div>
+
           {endpointTree.map((node) => renderNode(node))}
         </div>
       )}

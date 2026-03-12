@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { EndpointTestResult } from '../../types/api';
 import { EndpointHttpResultList } from './EndpointHttpResultList';
+import { EndpointResultOverview } from './EndpointResultOverview';
 import { SecurityCheckItem } from './SecurityCheckItem';
 import type { FilteredEndpointResult } from './filtering';
 
@@ -58,6 +59,12 @@ export function EndpointResultCard({ result }: EndpointResultCardProps) {
             {isCheckFiltered ? <span>{result.checks.length}/{totalCheckCount} checks shown</span> : null}
             {isHttpFiltered ? <span>{result.httpResults.length}/{totalHttpResultCount} HTTP runs shown</span> : null}
           </div>
+
+          <EndpointResultOverview
+            result={result}
+            totalCheckCount={totalCheckCount}
+            totalHttpResultCount={totalHttpResultCount}
+          />
 
           <EndpointHttpResultList httpResults={result.httpResults} totalCount={totalHttpResultCount} />
 

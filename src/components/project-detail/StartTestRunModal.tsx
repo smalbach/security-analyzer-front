@@ -11,6 +11,9 @@ import type {
 } from '../../types/api';
 import { SecurityRuleSelector } from '../SecurityRuleSelector';
 import { Button, FormField, Input, Modal } from '../ui';
+import { EndpointSelectorPanel } from './EndpointSelectorPanel';
+import { TestRunExecutionOptions } from './TestRunExecutionOptions';
+import { DEFAULT_TEST_RUN_EXECUTION_OPTIONS, buildStartTestRunPayload } from './testRunForm';
 
 interface StartTestRunModalProps {
   project: Project;
@@ -24,6 +27,8 @@ const EMPTY_CREDENTIAL: TestCredential = {
   role: '',
 };
 
+type EndpointScope = 'all' | 'selected';
+
 export function StartTestRunModal({
   project,
   onClose,
@@ -33,8 +38,13 @@ export function StartTestRunModal({
   const [label, setLabel] = useState('');
   const [credentials, setCredentials] = useState<TestCredential[]>([{ ...EMPTY_CREDENTIAL }]);
   const [rules, setRules] = useState<RuleSelection>(() => ({ ...DEFAULT_TEST_RUN_RULES }));
+  const [options, setOptions] = useState(DEFAULT_TEST_RUN_EXECUTION_OPTIONS);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // ─── Endpoint scope ────────────────────────────────────────────────────────
+  const [scope, setScope] = useState<EndpointScope>('all');
+  const [selectedEndpointIds, setSelectedEndpointIds] = useState<string[]>([]);
 
   const updateCredential = (index: number, patch: Partial<TestCredential>) => {
     setCredentials((previous) =>
@@ -58,15 +68,35 @@ export function StartTestRunModal({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    // Guard: if "selected" scope but nothing chosen, block submission
+    if (scope === 'selected' && selectedEndpointIds.length === 0) {
+      setError('Selecciona al menos un endpoint antes de iniciar el test run.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
     try {
-      const payload: StartTestRunRequest = {
-        label: label.trim() || undefined,
-        credentials: credentials.filter((credential) => credential.username.trim()),
+      const endpointIds =
+        scope === 'selected' && selectedEndpointIds.length > 0
+          ? selectedEndpointIds
+          : undefined;
+
+      const buildResult = buildStartTestRunPayload({
+        label,
+        credentials,
         rules,
-      };
+        options,
+        endpointIds,
+      });
+      if (buildResult.error || !buildResult.payload) {
+        setError(buildResult.error ?? 'Failed to build the test run payload.');
+        return;
+      }
+
+      const payload: StartTestRunRequest = buildResult.payload;
       const run = await api.startTestRun(project.id, payload);
       if (!run?.id) {
         setError('The test run started but no run id was returned yet. Please try again in a few seconds.');
@@ -86,7 +116,7 @@ export function StartTestRunModal({
   return (
     <Modal
       title="New Test Run"
-      description="Configure the run label, test credentials, and rule coverage before launching a scan."
+      description="Configure the run label, endpoint scope, test credentials, and rule coverage before launching a scan."
       size="2xl"
       onClose={onClose}
       bodyClassName="space-y-6"
@@ -117,6 +147,66 @@ export function StartTestRunModal({
           />
         </FormField>
 
+        {/* ── Endpoint scope ─────────────────────────────────────────────── */}
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-medium text-slate-300">Endpoints a testear</p>
+            <p className="text-xs text-slate-500">
+              Elige si quieres probar todos los endpoints del proyecto o sólo algunos.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {/* All endpoints option */}
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 transition hover:border-white/20 has-[:checked]:border-tide-400/40 has-[:checked]:bg-tide-500/10">
+              <input
+                type="radio"
+                name="endpoint-scope"
+                value="all"
+                checked={scope === 'all'}
+                onChange={() => setScope('all')}
+                className="accent-tide-400"
+              />
+              <div>
+                <p className="text-sm font-medium text-slate-200">Todos los endpoints</p>
+                <p className="text-xs text-slate-500">Ejecuta los tests sobre el proyecto completo.</p>
+              </div>
+            </label>
+
+            {/* Selected endpoints option — always enabled */}
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 transition hover:border-white/20 has-[:checked]:border-tide-400/40 has-[:checked]:bg-tide-500/10">
+              <input
+                type="radio"
+                name="endpoint-scope"
+                value="selected"
+                checked={scope === 'selected'}
+                onChange={() => setScope('selected')}
+                className="accent-tide-400"
+              />
+              <div>
+                <p className="text-sm font-medium text-slate-200">
+                  Seleccionados
+                  {scope === 'selected' && selectedEndpointIds.length > 0 ? (
+                    <span className="ml-1.5 text-xs text-tide-300">
+                      ({selectedEndpointIds.length})
+                    </span>
+                  ) : null}
+                </p>
+                <p className="text-xs text-slate-500">Elige qué endpoints incluir en este run.</p>
+              </div>
+            </label>
+          </div>
+
+          {/* Inline endpoint selector — shown when 'selected' is active */}
+          {scope === 'selected' ? (
+            <EndpointSelectorPanel
+              projectId={project.id}
+              onChange={setSelectedEndpointIds}
+            />
+          ) : null}
+        </div>
+
+        {/* ── Credentials ────────────────────────────────────────────────── */}
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -176,6 +266,11 @@ export function StartTestRunModal({
             ))}
           </div>
         </div>
+
+        <TestRunExecutionOptions
+          options={options}
+          onChange={(patch) => setOptions((current) => ({ ...current, ...patch }))}
+        />
 
         <SecurityRuleSelector value={rules} onChange={setRules} defaultCollapsed />
       </form>

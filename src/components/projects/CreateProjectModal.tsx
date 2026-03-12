@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
+import { ProjectAuthConfigFields, buildAuthConfigPayload, getAuthConfigLoginBodyText } from '../project-auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { isUnauthorizedError } from '../../lib/api';
-import type { CreateProjectRequest, Project } from '../../types/api';
+import type { AuthConfig, CreateProjectRequest, Project } from '../../types/api';
 import { Button, FormField, Input, Modal, Textarea } from '../ui';
 
 interface CreateProjectModalProps {
@@ -13,6 +14,9 @@ export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalPro
   const { api } = useAuth();
   const [form, setForm] = useState<CreateProjectRequest>({ name: '' });
   const [tagsInput, setTagsInput] = useState('');
+  const [authType, setAuthType] = useState<AuthConfig['type']>('none');
+  const [authConfig, setAuthConfig] = useState<AuthConfig>({ type: 'none' });
+  const [loginBodyText, setLoginBodyText] = useState(() => getAuthConfigLoginBodyText(null));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,9 +30,15 @@ export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalPro
         .split(',')
         .map((tag) => tag.trim())
         .filter(Boolean);
+      const authPayload = buildAuthConfigPayload(authType, authConfig, loginBodyText);
+      if (authPayload.error) {
+        setError(authPayload.error);
+        return;
+      }
 
       const payload: CreateProjectRequest = {
         ...form,
+        authConfig: authPayload.authConfig,
         tags: parsedTags.length > 0 ? parsedTags : undefined,
       };
 
@@ -48,7 +58,7 @@ export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalPro
     <Modal
       title="New Project"
       description="Create a project to group endpoints, credentials, and security test runs."
-      size="lg"
+      size="2xl"
       onClose={onClose}
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -106,6 +116,15 @@ export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalPro
             placeholder="production, v2, internal"
           />
         </FormField>
+
+        <ProjectAuthConfigFields
+          authType={authType}
+          authConfig={authConfig}
+          loginBodyText={loginBodyText}
+          onAuthTypeChange={setAuthType}
+          onAuthConfigChange={(patch) => setAuthConfig((current) => ({ ...current, ...patch }))}
+          onLoginBodyTextChange={setLoginBodyText}
+        />
       </form>
     </Modal>
   );

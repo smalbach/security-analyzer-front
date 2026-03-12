@@ -264,15 +264,24 @@ export class ApiClient {
   // ─── Test Runs ────────────────────────────────────────────────
 
   async startTestRun(projectId: string, data: StartTestRunRequest): Promise<TestRun> {
-    const result = await this.requestProtectedWithAuth<
-      TestRun | { id?: string; runId?: string; testRunId?: string }
-    >(`/projects/${projectId}/test-runs`, {
+    const response = await this.fetchProtectedWithAuth(`/projects/${projectId}/test-runs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    const locationHeader = response.headers.get('location') ?? response.headers.get('Location');
+    const text = await response.text();
+    const result = text
+      ? this.unwrap<TestRun | { id?: string; runId?: string; testRunId?: string }>(JSON.parse(text))
+      : undefined;
 
-    if (result && typeof result === 'object' && 'id' in result && typeof result.id === 'string') {
+    if (
+      result &&
+      typeof result === 'object' &&
+      'id' in result &&
+      typeof result.id === 'string' &&
+      ('status' in result || 'projectId' in result)
+    ) {
       return result as TestRun;
     }
 
@@ -281,6 +290,7 @@ export class ApiClient {
       (typeof record?.runId === 'string' && record.runId) ||
       (typeof record?.testRunId === 'string' && record.testRunId) ||
       (typeof record?.id === 'string' && record.id) ||
+      this.extractRunIdFromLocation(locationHeader) ||
       undefined;
 
     if (typeof identifier === 'string' && identifier.length > 0) {
@@ -553,6 +563,15 @@ export class ApiClient {
   }
 
   private async requestProtectedWithAuth<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const response = await this.fetchProtectedWithAuth(path, init);
+    const text = await response.text();
+    if (!text) return undefined as T;
+
+    const raw = JSON.parse(text);
+    return this.unwrap<T>(raw);
+  }
+
+  private async fetchProtectedWithAuth(path: string, init: RequestInit = {}): Promise<Response> {
     const headers: Record<string, string> = {
       ...(init.headers as Record<string, string> | undefined),
     };
@@ -586,11 +605,7 @@ export class ApiClient {
       throw new Error(message);
     }
 
-    const text = await response.text();
-    if (!text) return undefined as T;
-
-    const raw = JSON.parse(text);
-    return this.unwrap<T>(raw);
+    return response;
   }
 
   private async requestProtectedBlob(path: string): Promise<Blob> {
@@ -648,6 +663,17 @@ export class ApiClient {
 
   private handleUnauthorized(): void {
     this.unauthorizedHandler?.();
+  }
+
+  private extractRunIdFromLocation(locationHeader?: string | null): string | undefined {
+    if (!locationHeader) {
+      return undefined;
+    }
+
+    const normalizedLocation = locationHeader.replace(/\/$/, '');
+    const segments = normalizedLocation.split('/');
+    const lastSegment = segments[segments.length - 1];
+    return lastSegment || undefined;
   }
 
   /**

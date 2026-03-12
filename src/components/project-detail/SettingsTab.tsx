@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
+import { ProjectAuthConfigFields, buildAuthConfigPayload, getAuthConfigLoginBodyText } from '../project-auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { isUnauthorizedError } from '../../lib/api';
 import type { AuthConfig, Project } from '../../types/api';
-import { Button, FormField, Input, Select, Textarea } from '../ui';
+import { Button, FormField, Input, Textarea } from '../ui';
 
 interface SettingsTabProps {
   project: Project;
@@ -19,6 +20,7 @@ export function SettingsTab({ project, onUpdated }: SettingsTabProps) {
   });
   const [authType, setAuthType] = useState<AuthConfig['type']>(project.authConfig?.type ?? 'none');
   const [authConfig, setAuthConfig] = useState<AuthConfig>(project.authConfig ?? { type: 'none' });
+  const [loginBodyText, setLoginBodyText] = useState(() => getAuthConfigLoginBodyText(project.authConfig));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +32,12 @@ export function SettingsTab({ project, onUpdated }: SettingsTabProps) {
     setSaved(false);
 
     try {
+      const authPayload = buildAuthConfigPayload(authType, authConfig, loginBodyText);
+      if (authPayload.error) {
+        setError(authPayload.error);
+        return;
+      }
+
       const updatedProject = await api.updateProject(project.id, {
         name: form.name,
         description: form.description || undefined,
@@ -38,7 +46,7 @@ export function SettingsTab({ project, onUpdated }: SettingsTabProps) {
           .split(',')
           .map((tag) => tag.trim())
           .filter(Boolean),
-        authConfig: authType === 'none' ? undefined : { ...authConfig, type: authType },
+        authConfig: authPayload.authConfig,
       });
 
       onUpdated(updatedProject);
@@ -97,75 +105,14 @@ export function SettingsTab({ project, onUpdated }: SettingsTabProps) {
         />
       </FormField>
 
-      <div className="space-y-3 rounded-2xl border border-white/10 bg-white/3 p-4">
-        <p className="text-sm font-medium text-slate-300">Authentication</p>
-
-        <FormField label="Type" htmlFor="project-auth-type" labelClassName="text-xs text-slate-500">
-          <Select
-            id="project-auth-type"
-            value={authType}
-            onChange={(event) => setAuthType(event.target.value as AuthConfig['type'])}
-          >
-            <option value="none">None</option>
-            <option value="bearer">Bearer Token</option>
-            <option value="basic">Basic Auth</option>
-            <option value="api_key">API Key</option>
-          </Select>
-        </FormField>
-
-        {authType === 'bearer' ? (
-          <FormField label="Token" htmlFor="project-auth-token" labelClassName="text-xs text-slate-500">
-            <Input
-              id="project-auth-token"
-              value={authConfig.token ?? ''}
-              onChange={(event) => setAuthConfig({ ...authConfig, token: event.target.value })}
-              className="font-mono"
-              placeholder="eyJ..."
-            />
-          </FormField>
-        ) : null}
-
-        {authType === 'basic' ? (
-          <div className="grid gap-2 md:grid-cols-2">
-            <FormField label="Username" htmlFor="project-basic-username" labelClassName="text-xs text-slate-500">
-              <Input
-                id="project-basic-username"
-                value={authConfig.username ?? ''}
-                onChange={(event) => setAuthConfig({ ...authConfig, username: event.target.value })}
-              />
-            </FormField>
-            <FormField label="Password" htmlFor="project-basic-password" labelClassName="text-xs text-slate-500">
-              <Input
-                id="project-basic-password"
-                type="password"
-                value={authConfig.password ?? ''}
-                onChange={(event) => setAuthConfig({ ...authConfig, password: event.target.value })}
-              />
-            </FormField>
-          </div>
-        ) : null}
-
-        {authType === 'api_key' ? (
-          <div className="grid gap-2 md:grid-cols-2">
-            <FormField label="Header Name" htmlFor="project-api-key-header" labelClassName="text-xs text-slate-500">
-              <Input
-                id="project-api-key-header"
-                value={authConfig.header_name ?? 'X-API-Key'}
-                onChange={(event) => setAuthConfig({ ...authConfig, header_name: event.target.value })}
-                className="font-mono"
-              />
-            </FormField>
-            <FormField label="API Key" htmlFor="project-api-key-token" labelClassName="text-xs text-slate-500">
-              <Input
-                id="project-api-key-token"
-                value={authConfig.token ?? ''}
-                onChange={(event) => setAuthConfig({ ...authConfig, token: event.target.value })}
-                className="font-mono"
-              />
-            </FormField>
-          </div>
-        ) : null}
-      </div>
+      <ProjectAuthConfigFields
+        authType={authType}
+        authConfig={authConfig}
+        loginBodyText={loginBodyText}
+        onAuthTypeChange={setAuthType}
+        onAuthConfigChange={(patch) => setAuthConfig((current) => ({ ...current, ...patch }))}
+        onLoginBodyTextChange={setLoginBodyText}
+      />
 
       <Button type="submit" disabled={saving}>
         {saving ? 'Saving...' : 'Save Settings'}

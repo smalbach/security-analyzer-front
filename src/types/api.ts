@@ -39,6 +39,7 @@ export interface AuthConfig {
   login_endpoint?: string;
   login_method?: string;
   login_body?: Record<string, unknown>;
+  token_path?: string;
 }
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
@@ -193,6 +194,8 @@ export interface StartTestRunRequest {
   requestTimeout?: number;
   crossUserPermutations?: boolean;
   generatePdf?: boolean;
+  /** Specific endpoint UUIDs to test. Omit or pass empty to test all endpoints. */
+  endpointIds?: string[];
 }
 
 export interface TestRunSummary {
