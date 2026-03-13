@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { isUnauthorizedError } from '../../lib/api';
 import { DEFAULT_TEST_RUN_RULES } from '../../lib/testRuns';
 import type {
   Project,
+  ProjectRole,
   RuleSelection,
   StartTestRunRequest,
   TestCredential,
@@ -35,8 +36,15 @@ export function StartTestRunModal({
   onStarted,
 }: StartTestRunModalProps) {
   const { api } = useAuth();
+  const [roles, setRoles] = useState<ProjectRole[]>([]);
   const [label, setLabel] = useState('');
   const [credentials, setCredentials] = useState<TestCredential[]>([{ ...EMPTY_CREDENTIAL }]);
+
+  useEffect(() => {
+    api.getRoles(project.id)
+      .then(setRoles)
+      .catch(() => { /* roles optional — fall back to text input */ });
+  }, [api, project.id]);
   const [rules, setRules] = useState<RuleSelection>(() => ({ ...DEFAULT_TEST_RUN_RULES }));
   const [options, setOptions] = useState(DEFAULT_TEST_RUN_EXECUTION_OPTIONS);
   const [submitting, setSubmitting] = useState(false);
@@ -255,11 +263,32 @@ export function StartTestRunModal({
                     />
                   </FormField>
                   <FormField label="Role">
-                    <Input
-                      value={credential.role ?? ''}
-                      onChange={(event) => updateCredential(index, { role: event.target.value })}
-                      placeholder="admin"
-                    />
+                    {roles.length > 0 ? (
+                      <select
+                        className="field w-full"
+                        value={credential.roleId ?? ''}
+                        onChange={(event) => {
+                          const role = roles.find((r) => r.id === event.target.value);
+                          updateCredential(index, {
+                            roleId: event.target.value || undefined,
+                            role: role?.name,
+                          });
+                        }}
+                      >
+                        <option value="">— No role —</option>
+                        {roles.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input
+                        value={credential.role ?? ''}
+                        onChange={(event) => updateCredential(index, { role: event.target.value })}
+                        placeholder="admin"
+                      />
+                    )}
                   </FormField>
                 </div>
               </div>

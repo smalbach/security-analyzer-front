@@ -11,7 +11,7 @@ export function AppShell() {
       <AppBackground />
       <NavHeader />
 
-      <main className="relative mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 md:px-8 md:py-12">
+      <main className="app-main-shell relative mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 md:px-8 md:py-12">
         {isRedirectingToLogin ? (
           <div className="flex min-h-[50vh] items-center justify-center">
             <div className="text-center text-slate-300">

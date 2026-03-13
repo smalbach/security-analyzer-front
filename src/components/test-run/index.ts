@@ -1,5 +1,6 @@
 export * from './EndpointHttpResultList';
 export * from './EndpointResultCard';
+export * from './ExecutiveReportSection';
 export * from './EndpointResultOverview';
 export * from './HttpDataPreview';
 export * from './HttpExecutionCard';

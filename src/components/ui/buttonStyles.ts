@@ -10,14 +10,14 @@ interface ButtonStyleOptions {
 }
 
 const BASE_BUTTON_CLASS =
-  'inline-flex items-center justify-center gap-2 rounded-xl font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tide-500/35 disabled:cursor-not-allowed disabled:opacity-50';
+  'ui-button inline-flex items-center justify-center gap-2 rounded-xl font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tide-500/35 disabled:cursor-not-allowed disabled:opacity-50';
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-  primary: 'bg-tide-600/80 text-white hover:bg-tide-500/80',
-  secondary: 'border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10',
-  ghost: 'text-slate-300 hover:bg-white/5 hover:text-slate-100',
-  danger: 'border border-red-500/25 bg-red-500/10 text-red-300 hover:bg-red-500/20',
-  link: 'rounded-lg bg-transparent text-tide-400 hover:bg-transparent hover:text-tide-200',
+  primary: 'ui-button-primary bg-tide-600/80 text-white hover:bg-tide-500/80',
+  secondary: 'ui-button-secondary border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10',
+  ghost: 'ui-button-ghost text-slate-300 hover:bg-white/5 hover:text-slate-100',
+  danger: 'ui-button-danger border border-red-500/25 bg-red-500/10 text-red-300 hover:bg-red-500/20',
+  link: 'ui-button-link rounded-lg bg-transparent text-tide-400 hover:bg-transparent hover:text-tide-200',
 };
 
 const PADDED_SIZE_CLASSES: Record<ButtonSize, string> = {

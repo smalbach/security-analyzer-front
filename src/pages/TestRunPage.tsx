@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   EndpointResultCard,
+  ExecutiveReportSection,
   INITIAL_TEST_RUN_FILTERS,
   TestRunAiAnalysis,
   TestRunFilters,
@@ -17,13 +18,20 @@ import { Button, EmptyState, LinkButton } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { isUnauthorizedError } from '../lib/api';
 import { TEST_RUN_STATUS_BADGE } from '../lib/testRuns';
-import type { EndpointTestResult, ReportFormat, TestRun } from '../types/api';
+import type { EndpointTestResult, PaginatedTestRunResults, ReportFormat, TestRun } from '../types/api';
+
+const PAGE_SIZE = 20;
 
 export function TestRunPage() {
   const { projectId, runId } = useParams<{ projectId: string; runId: string }>();
   const { api } = useAuth();
 
+  // Core run metadata (status, summary, aiAnalysis) — refreshed while running
   const [run, setRun] = useState<TestRun | null>(null);
+  // Paginated endpoint results — only fetched after completion
+  const [paginatedResults, setPaginatedResults] = useState<PaginatedTestRunResults | null>(null);
+  const [resultsLoading, setResultsLoading] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filters, setFilters] = useState<TestRunFilterState>(INITIAL_TEST_RUN_FILTERS);
@@ -36,10 +44,24 @@ export function TestRunPage() {
     }
   };
 
-  const fetchRun = useCallback(async () => {
-    if (!projectId || !runId) {
-      return;
+  /** Fetch paginated results for a completed run */
+  const fetchResults = useCallback(async (page: number) => {
+    if (!projectId || !runId) return;
+    setResultsLoading(true);
+    try {
+      const data = await api.getTestRunResults(projectId, runId, { page, limit: PAGE_SIZE });
+      setPaginatedResults(data);
+    } catch (err) {
+      if (isUnauthorizedError(err)) return;
+      // Non-critical — keep showing what we have
+    } finally {
+      setResultsLoading(false);
     }
+  }, [api, projectId, runId]);
+
+  /** Poll lightweight status while running; load full data on first load or completion */
+  const fetchRun = useCallback(async () => {
+    if (!projectId || !runId) return;
 
     try {
       const nextRun = await api.getTestRun(projectId, runId);
@@ -47,32 +69,34 @@ export function TestRunPage() {
 
       if (nextRun.status === 'completed' || nextRun.status === 'failed') {
         stopPolling();
+        // On first completion fetch results page 1
+        if (!paginatedResults) {
+          await fetchResults(1);
+        }
       }
     } catch (loadError) {
-      if (isUnauthorizedError(loadError)) {
-        return;
-      }
+      if (isUnauthorizedError(loadError)) return;
       setError(loadError instanceof Error ? loadError.message : 'Failed to load test run');
       stopPolling();
     } finally {
       setLoading(false);
     }
-  }, [api, projectId, runId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, projectId, runId, fetchResults]);
 
   useEffect(() => {
     void fetchRun();
     pollRef.current = setInterval(() => void fetchRun(), 3000);
-
-    return () => {
-      stopPolling();
-    };
+    return () => { stopPolling(); };
   }, [fetchRun]);
 
-  const handleDownload = async (format: ReportFormat) => {
-    if (!projectId || !runId) {
-      return;
-    }
+  const handlePageChange = async (page: number) => {
+    await fetchResults(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
+  const handleDownload = async (format: ReportFormat) => {
+    if (!projectId || !runId) return;
     try {
       const blob = await api.downloadTestRunReport(projectId, runId, format);
       const url = URL.createObjectURL(blob);
@@ -82,17 +106,18 @@ export function TestRunPage() {
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (downloadError) {
-      if (isUnauthorizedError(downloadError)) {
-        return;
-      }
+      if (isUnauthorizedError(downloadError)) return;
       alert(downloadError instanceof Error ? downloadError.message : 'Download failed');
     }
   };
+
   const summary = run?.summary;
   const aiAnalysis = run?.aiAnalysis;
+
+  // For filtering we work on the current page's results
   const endpointResults = useMemo(
-    () => (run?.endpointResults ?? []) as EndpointTestResult[],
-    [run],
+    () => (paginatedResults?.endpointResults ?? []) as EndpointTestResult[],
+    [paginatedResults],
   );
   const filteredEndpointResults = useMemo(
     () => applyTestRunFilters(endpointResults, filters),
@@ -106,10 +131,7 @@ export function TestRunPage() {
     () => summarizeFilteredTestRunResults(filteredEndpointResults, endpointResults),
     [filteredEndpointResults, endpointResults],
   );
-  const hasActiveFilters = useMemo(
-    () => hasActiveTestRunFilters(filters),
-    [filters],
-  );
+  const hasActiveFilters = useMemo(() => hasActiveTestRunFilters(filters), [filters]);
 
   useEffect(() => {
     setFilters((currentFilters) => {
@@ -117,6 +139,9 @@ export function TestRunPage() {
       return areSameFilters(currentFilters, sanitizedFilters) ? currentFilters : sanitizedFilters;
     });
   }, [filterOptions]);
+
+  const pagination = paginatedResults?.pagination;
+  const totalEndpoints = paginatedResults?.endpointResultsTotal ?? 0;
 
   if (loading) {
     return <div className="py-20 text-center text-slate-500">Loading test run...</div>;
@@ -195,8 +220,11 @@ export function TestRunPage() {
 
       {summary ? <TestRunSummaryGrid summary={summary} aiAnalysis={aiAnalysis} /> : null}
       {aiAnalysis ? <TestRunAiAnalysis analysis={aiAnalysis} /> : null}
+      {aiAnalysis?.findingGroups?.length ? (
+        <ExecutiveReportSection findingGroups={aiAnalysis.findingGroups} />
+      ) : null}
 
-      {endpointResults.length ? (
+      {run.status === 'completed' ? (
         <div className="space-y-3">
           <TestRunFilters
             filters={filters}
@@ -209,10 +237,20 @@ export function TestRunPage() {
 
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-semibold text-slate-200">Endpoint Results</h2>
-            <p className="text-sm text-slate-500">{filteredEndpointResults.length} visible</p>
+            <div className="flex items-center gap-3 text-sm text-slate-500">
+              {pagination && pagination.totalPages > 1 ? (
+                <span>
+                  Page {pagination.page} / {pagination.totalPages} ({totalEndpoints} endpoints)
+                </span>
+              ) : (
+                <span>{totalEndpoints} endpoint{totalEndpoints !== 1 ? 's' : ''}</span>
+              )}
+            </div>
           </div>
 
-          {filteredEndpointResults.length ? (
+          {resultsLoading ? (
+            <div className="py-10 text-center text-slate-500">Loading results...</div>
+          ) : filteredEndpointResults.length ? (
             filteredEndpointResults.map((result, index) => (
               <EndpointResultCard key={`${result.url}-${index}`} result={result} />
             ))
@@ -228,6 +266,48 @@ export function TestRunPage() {
               className="bg-white/5"
             />
           )}
+
+          {/* Pagination controls */}
+          {pagination && pagination.totalPages > 1 ? (
+            <div className="flex items-center justify-center gap-2 pt-4">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={pagination.page <= 1 || resultsLoading}
+                onClick={() => void handlePageChange(pagination.page - 1)}
+              >
+                ← Prev
+              </Button>
+
+              <div className="flex gap-1">
+                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                  .filter((p) => Math.abs(p - pagination.page) <= 2)
+                  .map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => void handlePageChange(p)}
+                      disabled={resultsLoading}
+                      className={`h-8 w-8 rounded-lg text-sm font-medium transition-colors ${
+                        p === pagination.page
+                          ? 'bg-tide-500 text-white'
+                          : 'text-slate-400 hover:bg-white/10 hover:text-slate-200'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+              </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={pagination.page >= pagination.totalPages || resultsLoading}
+                onClick={() => void handlePageChange(pagination.page + 1)}
+              >
+                Next →
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

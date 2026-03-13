@@ -11,8 +11,10 @@ import {
 } from '../../lib/endpointTree';
 import type { EndpointTreeNode } from '../../lib/endpointTree';
 import { useEndpointSelectionStore } from '../../stores/endpointSelectionStore';
-import type { ApiEndpoint, Project } from '../../types/api';
+import type { ApiEndpoint, PaginatedEndpointsResponse, Project } from '../../types/api';
 import { Button, EmptyState, Input } from '../ui';
+
+const PAGE_SIZE = 50;
 
 const METHOD_COLOR: Record<string, string> = {
   GET: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
@@ -61,6 +63,10 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
   const { api } = useAuth();
   const navigate = useNavigate();
   const [endpoints, setEndpoints] = useState<ApiEndpoint[]>([]);
+  const [pagination, setPagination] = useState<PaginatedEndpointsResponse['meta'] | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
@@ -81,48 +87,59 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
     isSelected,
   } = useEndpointSelectionStore();
 
-  const fetchEndpoints = useCallback(async () => {
+  const fetchEndpoints = useCallback(async (page: number, searchTerm: string) => {
+    setLoading(true);
     try {
-      const response = await api.getEndpoints(project.id);
-      setEndpoints(response);
-      // Register the project in the selection store (resets selection if project changed).
-      setProject(project.id, response.map((ep) => ep.id));
+      const response = await api.getEndpoints(project.id, {
+        page,
+        limit: PAGE_SIZE,
+        search: searchTerm || undefined,
+      });
+      const result = response as PaginatedEndpointsResponse;
+      setEndpoints(result.data);
+      setPagination(result.meta);
+      setCurrentPage(page);
+      // Register the project in the selection store
+      setProject(project.id, result.data.map((ep) => ep.id));
     } catch (error) {
-      if (isUnauthorizedError(error)) {
-        return;
-      }
-      // Keep the current list if fetching fails.
+      if (isUnauthorizedError(error)) return;
     } finally {
       setLoading(false);
     }
   }, [api, project.id, setProject]);
 
   useEffect(() => {
-    void fetchEndpoints();
+    void fetchEndpoints(1, '');
   }, [fetchEndpoints]);
 
-  const endpointTree = useMemo(() => buildEndpointTree(endpoints), [endpoints]);
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+      void fetchEndpoints(1, searchInput);
+    }, 350);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
 
-  // All top-level IDs for the "select all" shortcut in the header bar
+  const endpointTree = useMemo(() => buildEndpointTree(endpoints), [endpoints]);
   const allEndpointIds = useMemo(() => endpoints.map((ep) => ep.id), [endpoints]);
 
-  const handleImportFile = async () => {
-    if (!importFile) {
-      return;
-    }
+  const handlePageChange = async (page: number) => {
+    await fetchEndpoints(page, search);
+  };
 
+  const handleImportFile = async () => {
+    if (!importFile) return;
     setImporting(true);
     setImportError('');
-
     try {
-      const result = await api.importEndpointsFromFile(project.id, importFile);
-      setEndpoints((previous) => [...previous, ...result.endpoints]);
+      await api.importEndpointsFromFile(project.id, importFile);
       setImportFile(null);
       setShowImportPanel(false);
+      await fetchEndpoints(1, search);
     } catch (error) {
-      if (isUnauthorizedError(error)) {
-        return;
-      }
+      if (isUnauthorizedError(error)) return;
       setImportError(error instanceof Error ? error.message : 'Import failed');
     } finally {
       setImporting(false);
@@ -130,21 +147,15 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
   };
 
   const handleImportCurl = async () => {
-    if (!curlInput.trim()) {
-      return;
-    }
-
+    if (!curlInput.trim()) return;
     setCurlImporting(true);
     setImportError('');
-
     try {
-      const endpoint = await api.importEndpointsFromCurl(project.id, curlInput.trim());
-      setEndpoints((previous) => [...previous, endpoint]);
+      await api.importEndpointsFromCurl(project.id, curlInput.trim());
       setCurlInput('');
+      await fetchEndpoints(1, search);
     } catch (error) {
-      if (isUnauthorizedError(error)) {
-        return;
-      }
+      if (isUnauthorizedError(error)) return;
       setImportError(error instanceof Error ? error.message : 'cURL import failed');
     } finally {
       setCurlImporting(false);
@@ -152,18 +163,12 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
   };
 
   const handleDelete = async (endpointId: string) => {
-    if (!confirm('Delete this endpoint?')) {
-      return;
-    }
-
+    if (!confirm('Delete this endpoint?')) return;
     try {
       await api.deleteEndpoint(project.id, endpointId);
-      setEndpoints((previous) => previous.filter((endpoint) => endpoint.id !== endpointId));
+      await fetchEndpoints(currentPage, search);
     } catch (error) {
-      if (isUnauthorizedError(error)) {
-        return;
-      }
-      // Keep the list unchanged if deletion fails.
+      if (isUnauthorizedError(error)) return;
     }
   };
 
@@ -190,10 +195,7 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
     return (
       <div key={node.id} className="space-y-2" style={{ paddingLeft: `${level * 14}px` }}>
         <div className="group flex w-full min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 transition hover:border-tide-400/40 hover:bg-white/[0.06]">
-          {/* Group checkbox */}
           <GroupCheckbox ids={nodeEndpointIds} onToggle={toggleGroup} />
-
-          {/* Expand / collapse button */}
           <button
             type="button"
             onClick={() => toggleNode(node.id)}
@@ -228,7 +230,6 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
                       : 'border-emerald-500/20 bg-emerald-500/[0.07] hover:border-emerald-400/40 hover:bg-emerald-500/[0.12]'
                   }`}
                 >
-                  {/* Individual endpoint checkbox */}
                   <input
                     type="checkbox"
                     checked={isSelected(endpoint.id)}
@@ -236,7 +237,6 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
                     className="h-4 w-4 shrink-0 cursor-pointer rounded border-white/20 accent-tide-400"
                     aria-label={`Select ${endpoint.method} ${endpoint.path}`}
                   />
-
                   <span className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
                     Endpoint
                   </span>
@@ -254,6 +254,18 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
                   >
                     {getDisplayPath(endpoint.path)}
                   </button>
+
+                  {/* Auth badge */}
+                  <span
+                    className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:inline-block ${
+                      endpoint.requiresAuth
+                        ? 'border-sky-400/30 bg-sky-400/10 text-sky-300'
+                        : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+                    }`}
+                  >
+                    {endpoint.requiresAuth ? 'Auth' : 'Public'}
+                  </span>
+
                   {endpoint.description ? (
                     <span className="hidden max-w-xs truncate text-xs text-slate-500 sm:block">
                       {endpoint.description}
@@ -328,33 +340,56 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
         </div>
       ) : null}
 
+      {/* Search */}
+      <Input
+        value={searchInput}
+        onChange={(e) => setSearchInput(e.target.value)}
+        placeholder="Search endpoints by path or description..."
+        className="bg-white/5"
+      />
+
       {loading ? (
         <div className="py-10 text-center text-slate-500">Loading...</div>
       ) : endpoints.length === 0 ? (
         <EmptyState
-          title="No endpoints yet."
-          description="Add a new endpoint or import an existing collection to start testing."
+          title={search ? 'No endpoints match your search.' : 'No endpoints yet.'}
+          description={
+            search
+              ? 'Try a different search term.'
+              : 'Add a new endpoint or import an existing collection to start testing.'
+          }
+          action={
+            search ? (
+              <Button variant="secondary" size="sm" onClick={() => setSearchInput('')}>
+                Clear search
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="space-y-3">
-          {/* ── Header bar with totals + selection controls ── */}
+          {/* ── Header bar ── */}
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-gradient-to-r from-white/10 via-white/5 to-transparent px-4 py-3">
             <div>
               <p className="text-xs uppercase tracking-widest text-slate-400">Endpoint explorer</p>
-              <p className="text-sm text-slate-200">Rutas agrupadas por recurso y version.</p>
+              <p className="text-sm text-slate-200">
+                {pagination
+                  ? `Showing ${endpoints.length} of ${pagination.total} endpoints`
+                  : `${endpoints.length} endpoints`}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               {selectedIds.size > 0 ? (
                 <>
                   <span className="rounded-full border border-tide-400/30 bg-tide-500/10 px-3 py-1 text-xs font-semibold text-tide-300">
-                    {selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+                    {selectedIds.size} selected
                   </span>
                   <button
                     type="button"
                     onClick={clearAll}
                     className="text-xs text-slate-400 transition hover:text-white"
                   >
-                    Limpiar
+                    Clear
                   </button>
                 </>
               ) : null}
@@ -363,15 +398,55 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
                 onClick={() => selectAll(allEndpointIds)}
                 className="text-xs text-slate-400 transition hover:text-slate-200"
               >
-                Seleccionar todos
+                Select all on page
               </button>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
-                {endpoints.length} endpoints
+                {pagination?.total ?? endpoints.length} total
               </span>
             </div>
           </div>
 
           {endpointTree.map((node) => renderNode(node))}
+
+          {/* Pagination */}
+          {pagination && pagination.totalPages > 1 ? (
+            <div className="flex items-center justify-center gap-2 pt-4">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={currentPage <= 1 || loading}
+                onClick={() => void handlePageChange(currentPage - 1)}
+              >
+                ← Prev
+              </Button>
+              <div className="flex gap-1">
+                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                  .filter((p) => Math.abs(p - currentPage) <= 2)
+                  .map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => void handlePageChange(p)}
+                      disabled={loading}
+                      className={`h-8 w-8 rounded-lg text-sm font-medium transition-colors ${
+                        p === currentPage
+                          ? 'bg-tide-500 text-white'
+                          : 'text-slate-400 hover:bg-white/10 hover:text-slate-200'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={currentPage >= pagination.totalPages || loading}
+                onClick={() => void handlePageChange(currentPage + 1)}
+              >
+                Next →
+              </Button>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

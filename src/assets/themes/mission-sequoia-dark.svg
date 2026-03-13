@@ -1,0 +1,80 @@
+<svg width="2048" height="1024" viewBox="0 0 2048 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="135" y1="914" x2="1895" y2="108" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0934B0"/>
+      <stop offset="0.26" stop-color="#0B62D0"/>
+      <stop offset="0.54" stop-color="#A88BC1"/>
+      <stop offset="0.72" stop-color="#F3A26E"/>
+      <stop offset="1" stop-color="#0D66D9"/>
+    </linearGradient>
+    <radialGradient id="coreGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1040 52) rotate(90) scale(286 518)">
+      <stop stop-color="#FFF4D0" stop-opacity="1"/>
+      <stop offset="0.44" stop-color="#FFD39C" stop-opacity="0.82"/>
+      <stop offset="1" stop-color="#FFD39C" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="leftBlue" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(416 670) rotate(35.8) scale(814 414)">
+      <stop stop-color="#25A6FF" stop-opacity="0.58"/>
+      <stop offset="0.52" stop-color="#0E71E0" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#0E71E0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rightBlue" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1830 274) rotate(144.8) scale(618 282)">
+      <stop stop-color="#38A9FF" stop-opacity="0.64"/>
+      <stop offset="0.5" stop-color="#0E74DF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#0E74DF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="softBloom" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1038 368) rotate(90) scale(624 496)">
+      <stop stop-color="#F7BC8E" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#F7BC8E" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur48" x="-160" y="-160" width="2368" height="1344" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="38"/>
+    </filter>
+    <linearGradient id="rayCream" x1="1040" y1="0" x2="1254" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF0C8" stop-opacity="0.96"/>
+      <stop offset="1" stop-color="#FFD9A4" stop-opacity="0.54"/>
+    </linearGradient>
+    <linearGradient id="rayGold" x1="1054" y1="0" x2="1510" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFC990" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#F4A365" stop-opacity="0.66"/>
+    </linearGradient>
+    <linearGradient id="rayOrange" x1="1010" y1="0" x2="486" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB878" stop-opacity="0.88"/>
+      <stop offset="1" stop-color="#F59655" stop-opacity="0.56"/>
+    </linearGradient>
+    <linearGradient id="rayLilac" x1="1000" y1="0" x2="860" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C69BC8" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#9A82C5" stop-opacity="0.32"/>
+    </linearGradient>
+    <linearGradient id="rayBlue" x1="980" y1="0" x2="204" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8D88C8" stop-opacity="0.46"/>
+      <stop offset="0.48" stop-color="#2A81E7" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#0C55CC" stop-opacity="0.56"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="2048" height="1024" fill="url(#bg)"/>
+
+  <g filter="url(#blur48)">
+    <ellipse cx="1042" cy="68" rx="314" ry="242" fill="url(#coreGlow)"/>
+    <ellipse cx="422" cy="702" rx="612" ry="302" fill="url(#leftBlue)"/>
+    <ellipse cx="1838" cy="252" rx="402" ry="218" fill="url(#rightBlue)"/>
+    <ellipse cx="1044" cy="402" rx="502" ry="428" fill="url(#softBloom)"/>
+  </g>
+
+  <path d="M886 -6H1128L-86 474L-86 278L886 -6Z" fill="#F6A060" fill-opacity="0.78"/>
+  <path d="M956 -8H1128L-82 626L-82 506L956 -8Z" fill="#FDB47D" fill-opacity="0.46"/>
+  <path d="M1014 -8H1098L0 1008H-8L1014 -8Z" fill="url(#rayBlue)"/>
+  <path d="M1036 -8H1100L364 1024H152L1036 -8Z" fill="#3293F1" fill-opacity="0.24"/>
+  <path d="M1048 -8H1126L760 1024H566L1048 -8Z" fill="url(#rayLilac)"/>
+  <path d="M1058 -8H1136L1134 1024H862L1058 -8Z" fill="url(#rayCream)"/>
+  <path d="M1096 -8H1188L1528 1024H1128L1096 -8Z" fill="url(#rayGold)"/>
+  <path d="M1128 -8H1270L1874 1024H1478L1128 -8Z" fill="#F1A162" fill-opacity="0.82"/>
+  <path d="M1180 -8H1360L2148 1024H1796L1180 -8Z" fill="#F0A268" fill-opacity="0.62"/>
+  <path d="M1238 -8H1600L2148 392V250L1238 -8Z" fill="#167EE8" fill-opacity="0.58"/>
+
+  <path d="M918 0H1080L418 1024H256L918 0Z" fill="#6C8CD9" fill-opacity="0.18"/>
+  <path d="M1046 0H1120L1326 1024H1210L1046 0Z" fill="#FFF2D6" fill-opacity="0.28"/>
+  <path d="M1114 0H1204L1702 1024H1584L1114 0Z" fill="#FFDDB1" fill-opacity="0.24"/>
+
+  <rect width="2048" height="1024" fill="url(#coreGlow)" fill-opacity="0.16"/>
+</svg>

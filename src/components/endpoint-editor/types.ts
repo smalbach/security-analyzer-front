@@ -1,6 +1,6 @@
 import type { RuleSelection } from '../../types/api';
 
-export type EndpointEditorTab = 'params' | 'headers' | 'body' | 'auth' | 'security';
+export type EndpointEditorTab = 'params' | 'headers' | 'body' | 'auth' | 'security' | 'access';
 export type ResponseTab = 'body' | 'headers';
 
 export interface KVPair {

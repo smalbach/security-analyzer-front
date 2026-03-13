@@ -43,8 +43,9 @@ export default {
           '50%': { transform: 'translateY(-8px)' },
         },
         rise: {
-          '0%': { opacity: '0', transform: 'translateY(10px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
+          '0%': { opacity: '0', transform: 'translateY(14px) scale(0.985)', filter: 'blur(10px)' },
+          '55%': { opacity: '1', transform: 'translateY(-1px) scale(1.002)', filter: 'blur(0px)' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)', filter: 'blur(0px)' },
         },
         scanline: {
           '0%': { transform: 'translateY(-100%)' },
@@ -59,7 +60,7 @@ export default {
       },
       animation: {
         drift: 'drift 6s ease-in-out infinite',
-        rise: 'rise 0.45s ease-out forwards',
+        rise: 'rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards',
         scanline: 'scanline 8s linear infinite',
         glitch: 'glitch 3s ease-in-out infinite',
       },

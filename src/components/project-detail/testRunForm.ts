@@ -29,8 +29,9 @@ export function buildStartTestRunPayload(args: {
       username: credential.username.trim(),
       password: credential.password.trim(),
       role: credential.role?.trim() || undefined,
+      roleId: credential.roleId || undefined,
     }))
-    .filter((credential) => credential.username || credential.password || credential.role);
+    .filter((credential) => credential.username || credential.password || credential.role || credential.roleId);
 
   if (credentials.length === 0) {
     return { error: 'At least one credential with username and password is required.' };

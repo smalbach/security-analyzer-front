@@ -1,34 +1,62 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-
-export type ThemeName = 'cyber' | 'matrix';
+import {
+  DEFAULT_THEME,
+  getThemeOption,
+  isThemeMode,
+  isThemeName,
+  resolveThemeMode,
+  type ThemeMode,
+  type ThemeName,
+} from './themeOptions';
 
 interface ThemeContextValue {
   theme: ThemeName;
+  mode: ThemeMode;
+  preferredMode: ThemeMode;
+  availableModes: ThemeMode[];
   setTheme: (theme: ThemeName) => void;
+  setMode: (mode: ThemeMode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: 'cyber',
+  theme: DEFAULT_THEME,
+  mode: 'dark',
+  preferredMode: 'dark',
+  availableModes: getThemeOption(DEFAULT_THEME).modes,
   setTheme: () => {},
+  setMode: () => {},
 });
 
-const STORAGE_KEY = 'asa-theme';
+const THEME_STORAGE_KEY = 'asa-theme';
+const MODE_STORAGE_KEY = 'asa-theme-mode';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeName>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored === 'matrix' ? 'matrix' : 'cyber';
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    return isThemeName(stored) ? stored : DEFAULT_THEME;
   });
+  const [preferredMode, setPreferredMode] = useState<ThemeMode>(() => {
+    const stored = localStorage.getItem(MODE_STORAGE_KEY);
+    return isThemeMode(stored) ? stored : 'dark';
+  });
+  const availableModes = getThemeOption(theme).modes;
+  const mode = resolveThemeMode(theme, preferredMode);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem(STORAGE_KEY, theme);
-  }, [theme]);
+    document.documentElement.setAttribute('data-color-mode', mode);
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme, mode]);
+
+  useEffect(() => {
+    localStorage.setItem(MODE_STORAGE_KEY, preferredMode);
+  }, [preferredMode]);
 
   const setTheme = (next: ThemeName) => setThemeState(next);
+  const setMode = (next: ThemeMode) => setPreferredMode(next);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, mode, preferredMode, availableModes, setTheme, setMode }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -13,7 +13,7 @@ import {
 } from '../components/endpoint-editor';
 import { useAuth } from '../contexts/AuthContext';
 import { isUnauthorizedError } from '../lib/api';
-import type { CreateEndpointRequest, RuleSelection, TestEndpointResponse } from '../types/api';
+import type { CreateEndpointRequest, DataScope, EndpointRoleAccess, RuleSelection, TestEndpointResponse } from '../types/api';
 
 export function EndpointEditorPage() {
   const { projectId, endpointId } = useParams<{ projectId: string; endpointId: string }>();
@@ -45,6 +45,11 @@ export function EndpointEditorPage() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
   const [saveError, setSaveError] = useState('');
+
+  // Role access state
+  const [roleAccess, setRoleAccess] = useState<EndpointRoleAccess[]>([]);
+  const [roleAccessLoading, setRoleAccessLoading] = useState(false);
+  const [roleAccessDirty, setRoleAccessDirty] = useState(false);
 
   const detectedPathParams = getDetectedPathParams(endpoint.path);
 
@@ -95,9 +100,23 @@ export function EndpointEditorPage() {
     }
   }, [api, endpointId, isNew, projectId]);
 
+  const fetchRoleAccess = useCallback(async () => {
+    if (isNew || !projectId || !endpointId) return;
+    setRoleAccessLoading(true);
+    try {
+      const data = await api.getEndpointRoleAccess(projectId, endpointId);
+      setRoleAccess(data);
+    } catch {
+      // Silently ignore — no roles configured is a normal state
+    } finally {
+      setRoleAccessLoading(false);
+    }
+  }, [api, endpointId, isNew, projectId]);
+
   useEffect(() => {
     void fetchEndpoint();
-  }, [fetchEndpoint]);
+    void fetchRoleAccess();
+  }, [fetchEndpoint, fetchRoleAccess]);
 
   const handleSave = async () => {
     if (!projectId) {
@@ -110,11 +129,23 @@ export function EndpointEditorPage() {
     try {
       const payload = buildEndpointPayload(endpoint, queryRows, headerRows, bodyText);
 
+      let savedId = endpointId;
       if (isNew) {
         const created = await api.createEndpoint(projectId, payload);
+        savedId = created.id;
         navigate(`/projects/${projectId}/endpoints/${created.id}`, { replace: true });
       } else if (endpointId) {
         await api.updateEndpoint(projectId, endpointId, payload);
+      }
+
+      // Save role access permissions if they were changed
+      if (roleAccessDirty && savedId && savedId !== 'new') {
+        await api.updateEndpointRoleAccess(
+          projectId,
+          savedId,
+          roleAccess.map((ra) => ({ roleId: ra.roleId, hasAccess: ra.hasAccess, dataScope: ra.dataScope })),
+        );
+        setRoleAccessDirty(false);
       }
     } catch (saveRequestError) {
       if (isUnauthorizedError(saveRequestError)) {
@@ -161,6 +192,13 @@ export function EndpointEditorPage() {
     }
   };
 
+  const handleRoleAccessChange = (roleId: string, field: 'hasAccess' | 'dataScope', value: boolean | DataScope) => {
+    setRoleAccess((prev) =>
+      prev.map((ra) => (ra.roleId === roleId ? { ...ra, [field]: value } : ra)),
+    );
+    setRoleAccessDirty(true);
+  };
+
   if (loading) {
     return <div className="py-20 text-center text-slate-500">Loading endpoint...</div>;
   }
@@ -190,6 +228,10 @@ export function EndpointEditorPage() {
           bodyText={bodyText}
           authToken={authToken}
           selectedRules={selectedRules}
+          endpoint={endpoint}
+          roleAccess={roleAccess}
+          roleAccessLoading={roleAccessLoading}
+          isNew={isNew}
           onTabChange={setActiveTab}
           onPathParamsChange={setPathParams}
           onQueryRowsChange={setQueryRows}
@@ -197,6 +239,8 @@ export function EndpointEditorPage() {
           onBodyTextChange={setBodyText}
           onAuthTokenChange={setAuthToken}
           onRulesChange={setSelectedRules}
+          onEndpointChange={(patch) => setEndpoint((current) => ({ ...current, ...patch }))}
+          onRoleAccessChange={handleRoleAccessChange}
         />
 
         <EndpointResponsePanel

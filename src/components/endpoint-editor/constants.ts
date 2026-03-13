@@ -18,6 +18,7 @@ export const REQUEST_TABS: { id: EndpointEditorTab; label: string }[] = [
   { id: 'headers', label: 'Headers' },
   { id: 'body', label: 'Body' },
   { id: 'auth', label: 'Auth' },
+  { id: 'access', label: 'Access Control' },
   { id: 'security', label: 'Security Rules' },
 ];
 

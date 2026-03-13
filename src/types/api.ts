@@ -179,10 +179,95 @@ export interface RuleSelection {
 export interface TestCredential {
   username: string;
   password: string;
+  /** Free-text role label (kept for backward compatibility) */
   role?: string;
+  /** UUID of a configured ProjectRole (takes precedence over free-text role) */
+  roleId?: string;
   loginEndpoint?: string;
   loginMethod?: string;
   loginBodyTemplate?: Record<string, unknown>;
+}
+
+// ─── Project Roles ────────────────────────────────────────────────────────────
+
+export type DataScope = 'all' | 'own' | 'none';
+
+export interface ProjectRole {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string | null;
+  color?: string | null;
+  /** If true, two users with this role should only see their own data */
+  sameRoleDataIsolation: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProjectRoleRequest {
+  name: string;
+  description?: string;
+  color?: string;
+  sameRoleDataIsolation?: boolean;
+}
+
+export type UpdateProjectRoleRequest = Partial<CreateProjectRoleRequest>;
+
+export interface RoleEndpointPermission {
+  id: string;
+  roleId: string;
+  endpointId: string;
+  hasAccess: boolean;
+  dataScope: DataScope;
+}
+
+export interface RoleEndpointPermissionItem {
+  endpointId: string;
+  hasAccess: boolean;
+  dataScope: DataScope;
+}
+
+export interface CrossRoleDataRule {
+  id: string;
+  projectId: string;
+  sourceRoleId: string;
+  targetRoleId: string;
+  /** Null = applies to all endpoints */
+  endpointId?: string | null;
+  canRead: boolean;
+  canWrite: boolean;
+  canDelete: boolean;
+  sourceRole?: { id: string; name: string };
+  targetRole?: { id: string; name: string };
+}
+
+export interface CrossRoleRuleItem {
+  sourceRoleId: string;
+  targetRoleId: string;
+  endpointId?: string | null;
+  canRead: boolean;
+  canWrite: boolean;
+  canDelete: boolean;
+}
+
+/** Role access configuration for a specific endpoint (inverse view of RolePermissionsPanel) */
+export interface EndpointRoleAccess {
+  roleId: string;
+  roleName: string;
+  color?: string | null;
+  hasAccess: boolean;
+  dataScope: DataScope;
+}
+
+/** Paginated response shape returned by GET /endpoints?page=... */
+export interface PaginatedEndpointsResponse {
+  data: ApiEndpoint[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface StartTestRunRequest {
@@ -230,6 +315,16 @@ export interface TestRun {
   completedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PaginatedTestRunResults extends TestRun {
+  endpointResultsTotal: number;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 // ─── Analysis / Test Results ──────────────────────────────────────────────────
@@ -302,6 +397,21 @@ export interface EndpointTestResult {
   lowFindings: number;
 }
 
+export interface FindingGroup {
+  ruleId: string;
+  ruleName: string;
+  category: string;
+  severity: string;
+  affectedEndpointsCount: number;
+  affectedEndpoints: { method: string; url: string }[];
+  finding: string;
+  remediation: string;
+  proposedSolution: string;
+  commonFix: string;
+  codeExample?: string;
+  references: string[];
+}
+
 export interface AiAnalysis {
   globalRiskLevel: 'Critical' | 'High' | 'Medium' | 'Low';
   securityScore: number;
@@ -321,6 +431,7 @@ export interface AiAnalysis {
   }[];
   executiveSummary: string;
   technicalSummary: string;
+  findingGroups?: FindingGroup[];
 }
 
 export interface AnalysisHistoryItem {

@@ -21,14 +21,22 @@ export function TabBar<TTab extends string>({
   className,
 }: TabBarProps<TTab>) {
   return (
-    <div className={cn(variant === 'underline' ? 'flex gap-1' : 'flex gap-2', className)}>
+    <div
+      className={cn(
+        'tab-bar',
+        variant === 'underline' ? 'tab-bar-underline flex gap-1' : 'tab-bar-pill flex gap-2',
+        className,
+      )}
+      data-variant={variant}
+    >
       {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"
           onClick={() => onChange(tab.id)}
           className={cn(
-            'text-sm transition',
+            'tab-bar-item text-sm transition',
+            activeTab === tab.id && 'tab-bar-item-active',
             variant === 'underline'
               ? activeTab === tab.id
                 ? 'rounded-t-lg border-b-2 border-tide-400 px-3 py-2 text-tide-300'

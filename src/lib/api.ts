@@ -6,18 +6,28 @@ import type {
   AuthUser,
   CreateEndpointRequest,
   CreateProjectRequest,
+  CrossRoleDataRule,
+  CrossRoleRuleItem,
   ImportResult,
   PaginatedResponse,
   PreviewAndStartResponse,
   PreviewData,
   PreviewFileRequest,
   Project,
+  ProjectRole,
+  CreateProjectRoleRequest,
+  UpdateProjectRoleRequest,
   ReportFormat,
+  EndpointRoleAccess,
+  PaginatedEndpointsResponse,
+  RoleEndpointPermission,
+  RoleEndpointPermissionItem,
   StartTestRunRequest,
   StatusResponse,
   TestEndpointRequest,
   TestEndpointResponse,
   TestRun,
+  PaginatedTestRunResults,
   UpdateProjectRequest,
 } from '../types/api';
 
@@ -178,9 +188,57 @@ export class ApiClient {
     });
   }
 
-  async getEndpoints(projectId: string): Promise<ApiEndpoint[]> {
-    const result = await this.requestProtected<ApiEndpoint[] | { data: ApiEndpoint[] }>(
-      `/projects/${projectId}/endpoints`,
+  async getEndpoints(projectId: string): Promise<ApiEndpoint[]>;
+  async getEndpoints(
+    projectId: string,
+    params: { page?: number; limit?: number; search?: string; all?: boolean },
+  ): Promise<PaginatedEndpointsResponse>;
+  async getEndpoints(
+    projectId: string,
+    params?: { page?: number; limit?: number; search?: string; all?: boolean },
+  ): Promise<ApiEndpoint[] | PaginatedEndpointsResponse> {
+    if (!params) {
+      const result = await this.requestProtected<ApiEndpoint[] | { data: ApiEndpoint[] }>(
+        `/projects/${projectId}/endpoints`,
+      );
+      return Array.isArray(result) ? result : result.data;
+    }
+
+    const query = new URLSearchParams();
+    if (params.all) {
+      query.set('limit', '500');
+    } else {
+      if (params.page !== undefined) query.set('page', String(params.page));
+      if (params.limit !== undefined) query.set('limit', String(params.limit));
+      if (params.search) query.set('search', params.search);
+    }
+
+    const qs = query.toString();
+    const result = await this.requestProtected<PaginatedEndpointsResponse>(
+      `/projects/${projectId}/endpoints${qs ? `?${qs}` : ''}`,
+    );
+    return result;
+  }
+
+  async getEndpointRoleAccess(projectId: string, endpointId: string): Promise<EndpointRoleAccess[]> {
+    const result = await this.requestProtected<EndpointRoleAccess[] | { data: EndpointRoleAccess[] }>(
+      `/projects/${projectId}/endpoints/${endpointId}/role-access`,
+    );
+    return Array.isArray(result) ? result : result.data;
+  }
+
+  async updateEndpointRoleAccess(
+    projectId: string,
+    endpointId: string,
+    items: Pick<EndpointRoleAccess, 'roleId' | 'hasAccess' | 'dataScope'>[],
+  ): Promise<EndpointRoleAccess[]> {
+    const result = await this.requestProtectedWithAuth<EndpointRoleAccess[] | { data: EndpointRoleAccess[] }>(
+      `/projects/${projectId}/endpoints/${endpointId}/role-access`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissions: items }),
+      },
     );
     return Array.isArray(result) ? result : result.data;
   }
@@ -311,6 +369,20 @@ export class ApiClient {
     return this.requestProtected<TestRun>(`/projects/${projectId}/test-runs/${runId}`);
   }
 
+  async getTestRunResults(
+    projectId: string,
+    runId: string,
+    params: { page?: number; limit?: number } = {},
+  ): Promise<PaginatedTestRunResults> {
+    const query = new URLSearchParams();
+    if (params.page !== undefined) query.set('page', String(params.page));
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    const qs = query.toString();
+    return this.requestProtected<PaginatedTestRunResults>(
+      `/projects/${projectId}/test-runs/${runId}${qs ? `?${qs}` : ''}`,
+    );
+  }
+
   async getTestRunStatus(projectId: string, runId: string): Promise<StatusResponse> {
     return this.requestProtected<StatusResponse>(`/projects/${projectId}/test-runs/${runId}/status`);
   }
@@ -335,6 +407,82 @@ export class ApiClient {
         body: JSON.stringify({ visibility }),
       },
     );
+  }
+
+  // ─── Roles ────────────────────────────────────────────────────
+
+  async getRoles(projectId: string): Promise<ProjectRole[]> {
+    const result = await this.requestProtected<ProjectRole[] | { data: ProjectRole[] }>(
+      `/projects/${projectId}/roles`,
+    );
+    return Array.isArray(result) ? result : result.data;
+  }
+
+  async createRole(projectId: string, data: CreateProjectRoleRequest): Promise<ProjectRole> {
+    return this.requestProtectedWithAuth<ProjectRole>(`/projects/${projectId}/roles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateRole(projectId: string, roleId: string, data: UpdateProjectRoleRequest): Promise<ProjectRole> {
+    return this.requestProtectedWithAuth<ProjectRole>(`/projects/${projectId}/roles/${roleId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteRole(projectId: string, roleId: string): Promise<void> {
+    return this.requestProtectedWithAuth<void>(`/projects/${projectId}/roles/${roleId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getRolePermissions(projectId: string, roleId: string): Promise<RoleEndpointPermission[]> {
+    const result = await this.requestProtected<RoleEndpointPermission[] | { data: RoleEndpointPermission[] }>(
+      `/projects/${projectId}/roles/${roleId}/permissions`,
+    );
+    return Array.isArray(result) ? result : result.data;
+  }
+
+  async saveRolePermissions(
+    projectId: string,
+    roleId: string,
+    permissions: RoleEndpointPermissionItem[],
+  ): Promise<RoleEndpointPermission[]> {
+    const result = await this.requestProtectedWithAuth<RoleEndpointPermission[] | { data: RoleEndpointPermission[] }>(
+      `/projects/${projectId}/roles/${roleId}/permissions`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissions }),
+      },
+    );
+    return Array.isArray(result) ? result : (result as any).data ?? result;
+  }
+
+  async getCrossRoleRules(projectId: string): Promise<CrossRoleDataRule[]> {
+    const result = await this.requestProtected<CrossRoleDataRule[] | { data: CrossRoleDataRule[] }>(
+      `/projects/${projectId}/role-rules`,
+    );
+    return Array.isArray(result) ? result : result.data;
+  }
+
+  async saveCrossRoleRules(
+    projectId: string,
+    rules: CrossRoleRuleItem[],
+  ): Promise<CrossRoleDataRule[]> {
+    const result = await this.requestProtectedWithAuth<CrossRoleDataRule[] | { data: CrossRoleDataRule[] }>(
+      `/projects/${projectId}/role-rules`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rules }),
+      },
+    );
+    return Array.isArray(result) ? result : (result as any).data ?? result;
   }
 
   // ─── Existing methods ──────────────────────────────────────────

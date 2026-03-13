@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import {
   EndpointsTab,
   ProjectDetailHeader,
+  RolesTab,
   SettingsTab,
   TestRunsTab,
 } from '../components/project-detail';
@@ -11,16 +12,17 @@ import { useAuth } from '../contexts/AuthContext';
 import { isUnauthorizedError } from '../lib/api';
 import type { Project } from '../types/api';
 
-type Tab = 'endpoints' | 'test-runs' | 'settings';
+type Tab = 'endpoints' | 'roles' | 'test-runs' | 'settings';
 
 const PROJECT_TABS: { id: Tab; label: string }[] = [
   { id: 'endpoints', label: 'Endpoints' },
+  { id: 'roles', label: 'Roles' },
   { id: 'test-runs', label: 'Test Runs' },
   { id: 'settings', label: 'Settings' },
 ];
 
 function getActiveTab(value: string | null): Tab {
-  if (value === 'test-runs' || value === 'settings') {
+  if (value === 'roles' || value === 'test-runs' || value === 'settings') {
     return value;
   }
 
@@ -89,6 +91,7 @@ export function ProjectDetailPage() {
 
         <div className="p-6">
           {activeTab === 'endpoints' ? <EndpointsTab project={project} /> : null}
+          {activeTab === 'roles' ? <RolesTab project={project} /> : null}
           {activeTab === 'test-runs' ? <TestRunsTab project={project} /> : null}
           {activeTab === 'settings' ? (
             <SettingsTab project={project} onUpdated={setProject} />
