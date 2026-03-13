@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
   EndpointsTab,
@@ -8,9 +7,7 @@ import {
   TestRunsTab,
 } from '../components/project-detail';
 import { TabBar } from '../components/ui';
-import { useAuth } from '../contexts/AuthContext';
-import { isUnauthorizedError } from '../lib/api';
-import type { Project } from '../types/api';
+import { useProject } from '../features/projects/hooks';
 
 type Tab = 'endpoints' | 'roles' | 'test-runs' | 'settings';
 
@@ -32,32 +29,9 @@ function getActiveTab(value: string | null): Tab {
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { api } = useAuth();
 
   const activeTab = getActiveTab(searchParams.get('tab'));
-
-  const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!projectId) {
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    api.getProject(projectId)
-      .then(setProject)
-      .catch((loadError) => {
-        if (isUnauthorizedError(loadError)) {
-          return;
-        }
-        setError(loadError instanceof Error ? loadError.message : 'Failed to load project');
-      })
-      .finally(() => setLoading(false));
-  }, [api, projectId]);
+  const { project, loading, error, setProject } = useProject(projectId);
 
   const setTab = (tab: Tab) => {
     const nextSearchParams = new URLSearchParams(searchParams);

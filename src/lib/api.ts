@@ -2,24 +2,20 @@ import type {
   AnalysisHistoryItem,
   AnalysisReport,
   ApiEndpoint,
-  AuthResponse,
-  AuthUser,
   CreateEndpointRequest,
   CreateProjectRequest,
   CrossRoleDataRule,
   CrossRoleRuleItem,
+  EndpointRoleAccess,
   ImportResult,
+  PaginatedEndpointsResponse,
   PaginatedResponse,
+  PaginatedTestRunResults,
   PreviewAndStartResponse,
   PreviewData,
   PreviewFileRequest,
-  Project,
   ProjectRole,
-  CreateProjectRoleRequest,
-  UpdateProjectRoleRequest,
   ReportFormat,
-  EndpointRoleAccess,
-  PaginatedEndpointsResponse,
   RoleEndpointPermission,
   RoleEndpointPermissionItem,
   StartTestRunRequest,
@@ -27,30 +23,43 @@ import type {
   TestEndpointRequest,
   TestEndpointResponse,
   TestRun,
-  PaginatedTestRunResults,
   UpdateProjectRequest,
+  CreateProjectRoleRequest,
+  UpdateProjectRoleRequest,
 } from '../types/api';
+import {
+  forgotPassword as forgotPasswordRequest,
+  getProfile as getProfileRequest,
+  login as loginRequest,
+  logout as logoutRequest,
+  refreshToken as refreshTokenRequest,
+  register as registerRequest,
+  resetPassword as resetPasswordRequest,
+} from '../services/api/authApi';
+import {
+  createProject as createProjectRequest,
+  deleteProject as deleteProjectRequest,
+  getProject as getProjectRequest,
+  getProjects as getProjectsRequest,
+  updateProject as updateProjectRequest,
+} from '../services/api/projectsApi';
+import { ApiUnauthorizedError, isUnauthorizedError } from '../services/http/errors';
+import {
+  extractErrorMessage,
+  extractRunIdFromLocation,
+  unwrapEnvelope,
+} from '../services/http/helpers';
+import {
+  fetchProtectedWithAuth as fetchProtectedWithAuthRequest,
+  request as requestPublic,
+  requestProtected as requestProtectedResource,
+  requestProtectedBlob as requestProtectedBlobResource,
+  requestProtectedWithAuth as requestProtectedWithAuthResource,
+  retryAfterRefresh as retryAfterRefreshRequest,
+} from '../services/http/requests';
+import type { ApiRequestContext, ApiRequestOptions } from '../services/http/types';
 
-/**
- * Shape returned by the backend TransformInterceptor.
- * All non-@Res() endpoints are wrapped in this envelope.
- */
-interface ApiEnvelope<T = unknown> {
-  success: boolean;
-  data: T;
-  timestamp: string;
-}
-
-export class ApiUnauthorizedError extends Error {
-  constructor(message = 'Unauthorized') {
-    super(message);
-    this.name = 'ApiUnauthorizedError';
-  }
-}
-
-export function isUnauthorizedError(error: unknown): error is ApiUnauthorizedError {
-  return error instanceof ApiUnauthorizedError;
-}
+export { ApiUnauthorizedError, isUnauthorizedError };
 
 export class ApiClient {
   private readonly baseUrl: string;
@@ -69,6 +78,18 @@ export class ApiClient {
     this.unauthorizedHandler = handler;
   }
 
+  private getRequestContext(): ApiRequestContext {
+    return {
+      baseUrl: this.baseUrl,
+      getAccessToken: () => this.accessToken,
+      setAccessToken: (token) => {
+        this.accessToken = token;
+      },
+      refreshToken: () => this.refreshToken(),
+      handleUnauthorized: () => this.handleUnauthorized(),
+    };
+  }
+
   clone(baseUrl: string): ApiClient {
     const client = new ApiClient(baseUrl);
     client.accessToken = this.accessToken;
@@ -76,60 +97,32 @@ export class ApiClient {
     return client;
   }
 
-  // ─── Auth methods ───────────────────────────────────────────────
-
-  async login(email: string, password: string): Promise<AuthResponse> {
-    return this.requestWithAuth<AuthResponse>('/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
+  async login(email: string, password: string) {
+    return loginRequest(this.getRequestContext(), email, password);
   }
 
-  async register(name: string, email: string, password: string): Promise<AuthResponse> {
-    return this.requestWithAuth<AuthResponse>('/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password }),
-    });
+  async register(name: string, email: string, password: string) {
+    return registerRequest(this.getRequestContext(), name, email, password);
   }
 
   async logout(): Promise<void> {
-    await this.requestWithAuth<void>('/auth/logout', { method: 'POST' });
+    await logoutRequest(this.getRequestContext());
   }
 
   async refreshToken(): Promise<{ accessToken: string }> {
-    const response = await fetch(`${this.baseUrl}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      throw new Error(await this.extractErrorMessage(response));
-    }
-
-    const raw = await response.json();
-    return this.unwrap<{ accessToken: string }>(raw);
+    return refreshTokenRequest(this.getRequestContext());
   }
 
   async forgotPassword(email: string): Promise<{ message: string }> {
-    return this.requestWithAuth<{ message: string }>('/auth/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
+    return forgotPasswordRequest(this.getRequestContext(), email);
   }
 
   async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-    return this.requestWithAuth<{ message: string }>('/auth/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, newPassword }),
-    });
+    return resetPasswordRequest(this.getRequestContext(), token, newPassword);
   }
 
-  async getProfile(): Promise<AuthUser> {
-    return this.request<AuthUser>('/auth/me');
+  async getProfile() {
+    return getProfileRequest(this.getRequestContext());
   }
 
   async updateVisibility(
@@ -146,39 +139,25 @@ export class ApiClient {
     );
   }
 
-  // ─── Projects ─────────────────────────────────────────────────
-
-  async createProject(data: CreateProjectRequest): Promise<Project> {
-    return this.requestProtectedWithAuth<Project>('/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+  async createProject(data: CreateProjectRequest) {
+    return createProjectRequest(this.getRequestContext(), data);
   }
 
-  async getProjects(_params?: { page?: number; limit?: number }): Promise<{ data: Project[] }> {
-    const result = await this.requestProtected<Project[] | { data: Project[] }>('/projects');
-    // Backend returns plain array; normalize to { data } shape for callers
-    return Array.isArray(result) ? { data: result } : result;
+  async getProjects(params?: { page?: number; limit?: number }) {
+    return getProjectsRequest(this.getRequestContext(), params);
   }
 
-  async getProject(id: string): Promise<Project> {
-    return this.requestProtected<Project>(`/projects/${id}`);
+  async getProject(id: string) {
+    return getProjectRequest(this.getRequestContext(), id);
   }
 
-  async updateProject(id: string, data: UpdateProjectRequest): Promise<Project> {
-    return this.requestProtectedWithAuth<Project>(`/projects/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+  async updateProject(id: string, data: UpdateProjectRequest) {
+    return updateProjectRequest(this.getRequestContext(), id, data);
   }
 
   async deleteProject(id: string): Promise<void> {
-    return this.requestProtectedWithAuth<void>(`/projects/${id}`, { method: 'DELETE' });
+    return deleteProjectRequest(this.getRequestContext(), id);
   }
-
-  // ─── Endpoints ────────────────────────────────────────────────
 
   async createEndpoint(projectId: string, data: CreateEndpointRequest): Promise<ApiEndpoint> {
     return this.requestProtectedWithAuth<ApiEndpoint>(`/projects/${projectId}/endpoints`, {
@@ -214,10 +193,9 @@ export class ApiClient {
     }
 
     const qs = query.toString();
-    const result = await this.requestProtected<PaginatedEndpointsResponse>(
+    return this.requestProtected<PaginatedEndpointsResponse>(
       `/projects/${projectId}/endpoints${qs ? `?${qs}` : ''}`,
     );
-    return result;
   }
 
   async getEndpointRoleAccess(projectId: string, endpointId: string): Promise<EndpointRoleAccess[]> {
@@ -247,7 +225,11 @@ export class ApiClient {
     return this.requestProtected<ApiEndpoint>(`/projects/${projectId}/endpoints/${endpointId}`);
   }
 
-  async updateEndpoint(projectId: string, endpointId: string, data: Partial<CreateEndpointRequest>): Promise<ApiEndpoint> {
+  async updateEndpoint(
+    projectId: string,
+    endpointId: string,
+    data: Partial<CreateEndpointRequest>,
+  ): Promise<ApiEndpoint> {
     return this.requestProtectedWithAuth<ApiEndpoint>(`/projects/${projectId}/endpoints/${endpointId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -256,10 +238,9 @@ export class ApiClient {
   }
 
   async deleteEndpoint(projectId: string, endpointId: string): Promise<void> {
-    return this.requestProtectedWithAuth<void>(
-      `/projects/${projectId}/endpoints/${endpointId}`,
-      { method: 'DELETE' },
-    );
+    return this.requestProtectedWithAuth<void>(`/projects/${projectId}/endpoints/${endpointId}`, {
+      method: 'DELETE',
+    });
   }
 
   async importEndpointsFromFile(projectId: string, file: File): Promise<ImportResult> {
@@ -267,7 +248,9 @@ export class ApiClient {
     formData.append('file', file);
 
     const headers: Record<string, string> = {};
-    if (this.accessToken) headers['Authorization'] = `Bearer ${this.accessToken}`;
+    if (this.accessToken) {
+      headers.Authorization = `Bearer ${this.accessToken}`;
+    }
 
     let response = await fetch(`${this.baseUrl}/projects/${projectId}/endpoints/import/file`, {
       method: 'POST',
@@ -299,8 +282,8 @@ export class ApiClient {
       }
       throw new Error(message);
     }
-    const raw = await response.json();
-    return this.unwrap<ImportResult>(raw);
+
+    return this.unwrap<ImportResult>(await response.json());
   }
 
   async importEndpointsFromCurl(projectId: string, curl: string): Promise<ApiEndpoint> {
@@ -311,15 +294,20 @@ export class ApiClient {
     });
   }
 
-  async testEndpoint(projectId: string, endpointId: string, data: TestEndpointRequest): Promise<TestEndpointResponse> {
-    return this.requestProtectedWithAuth<TestEndpointResponse>(`/projects/${projectId}/endpoints/${endpointId}/test`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+  async testEndpoint(
+    projectId: string,
+    endpointId: string,
+    data: TestEndpointRequest,
+  ): Promise<TestEndpointResponse> {
+    return this.requestProtectedWithAuth<TestEndpointResponse>(
+      `/projects/${projectId}/endpoints/${endpointId}/test`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      },
+    );
   }
-
-  // ─── Test Runs ────────────────────────────────────────────────
 
   async startTestRun(projectId: string, data: StartTestRunRequest): Promise<TestRun> {
     const response = await this.fetchProtectedWithAuth(`/projects/${projectId}/test-runs`, {
@@ -327,6 +315,7 @@ export class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+
     const locationHeader = response.headers.get('location') ?? response.headers.get('Location');
     const text = await response.text();
     const result = text
@@ -348,8 +337,7 @@ export class ApiClient {
       (typeof record?.runId === 'string' && record.runId) ||
       (typeof record?.testRunId === 'string' && record.testRunId) ||
       (typeof record?.id === 'string' && record.id) ||
-      this.extractRunIdFromLocation(locationHeader) ||
-      undefined;
+      this.extractRunIdFromLocation(locationHeader);
 
     if (typeof identifier === 'string' && identifier.length > 0) {
       return this.getTestRun(projectId, identifier);
@@ -378,6 +366,7 @@ export class ApiClient {
     if (params.page !== undefined) query.set('page', String(params.page));
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     const qs = query.toString();
+
     return this.requestProtected<PaginatedTestRunResults>(
       `/projects/${projectId}/test-runs/${runId}${qs ? `?${qs}` : ''}`,
     );
@@ -388,9 +377,6 @@ export class ApiClient {
   }
 
   async downloadTestRunReport(projectId: string, runId: string, format: ReportFormat): Promise<Blob> {
-    const headers: Record<string, string> = {};
-    if (this.accessToken) headers['Authorization'] = `Bearer ${this.accessToken}`;
-
     return this.requestProtectedBlob(`/projects/${projectId}/test-runs/${runId}/report/${format}`);
   }
 
@@ -408,8 +394,6 @@ export class ApiClient {
       },
     );
   }
-
-  // ─── Roles ────────────────────────────────────────────────────
 
   async getRoles(projectId: string): Promise<ProjectRole[]> {
     const result = await this.requestProtected<ProjectRole[] | { data: ProjectRole[] }>(
@@ -460,7 +444,7 @@ export class ApiClient {
         body: JSON.stringify({ permissions }),
       },
     );
-    return Array.isArray(result) ? result : (result as any).data ?? result;
+    return Array.isArray(result) ? result : result.data;
   }
 
   async getCrossRoleRules(projectId: string): Promise<CrossRoleDataRule[]> {
@@ -470,10 +454,7 @@ export class ApiClient {
     return Array.isArray(result) ? result : result.data;
   }
 
-  async saveCrossRoleRules(
-    projectId: string,
-    rules: CrossRoleRuleItem[],
-  ): Promise<CrossRoleDataRule[]> {
+  async saveCrossRoleRules(projectId: string, rules: CrossRoleRuleItem[]): Promise<CrossRoleDataRule[]> {
     const result = await this.requestProtectedWithAuth<CrossRoleDataRule[] | { data: CrossRoleDataRule[] }>(
       `/projects/${projectId}/role-rules`,
       {
@@ -482,10 +463,8 @@ export class ApiClient {
         body: JSON.stringify({ rules }),
       },
     );
-    return Array.isArray(result) ? result : (result as any).data ?? result;
+    return Array.isArray(result) ? result : result.data;
   }
-
-  // ─── Existing methods ──────────────────────────────────────────
 
   async previewFile(params: PreviewFileRequest): Promise<PreviewAndStartResponse> {
     const formData = new FormData();
@@ -512,7 +491,7 @@ export class ApiClient {
 
     const headers: Record<string, string> = {};
     if (this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
+      headers.Authorization = `Bearer ${this.accessToken}`;
     }
 
     let response = await fetch(`${this.baseUrl}/analysis/preview-file`, {
@@ -543,14 +522,10 @@ export class ApiClient {
       throw new Error(message);
     }
 
-    const raw = await response.json();
-
-    // Unwrap TransformInterceptor envelope { success, data, timestamp }
     const payload = this.unwrap<
       PreviewAndStartResponse | (PreviewData & { analysisId?: string; message?: string; preview?: PreviewData })
-    >(raw);
+    >(await response.json());
 
-    // Backend returns { analysisId, message, preview: { ... } }
     if ('preview' in payload && payload.preview) {
       return payload as PreviewAndStartResponse;
     }
@@ -599,214 +574,31 @@ export class ApiClient {
   }
 
   async downloadReport(analysisId: string, format: ReportFormat): Promise<Blob> {
-    const headers: Record<string, string> = {};
-    if (this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
-    }
-
     return this.requestProtectedBlob(`/analysis/${analysisId}/report/${format}`);
   }
 
-  // ─── Internal helpers ─────────────────────────────────────────────
-
-  private async request<T>(
-    path: string,
-    options: { retryOnUnauthorized?: boolean; handleUnauthorized?: boolean } = {},
-  ): Promise<T> {
-    const headers: Record<string, string> = {};
-    if (this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
-    }
-
-    let response = await fetch(`${this.baseUrl}${path}`, {
-      credentials: 'include',
-      headers,
-    });
-
-    if (response.status === 401 && options.retryOnUnauthorized && this.accessToken) {
-      const retryResponse = await this.retryAfterRefresh(`${this.baseUrl}${path}`, {
-        credentials: 'include',
-        headers,
-      });
-      if (retryResponse) {
-        response = retryResponse;
-      }
-    }
-
-    if (!response.ok) {
-      const message = await this.extractErrorMessage(response);
-      if (response.status === 401 && options.handleUnauthorized) {
-        this.handleUnauthorized();
-        throw new ApiUnauthorizedError(message);
-      }
-      throw new Error(message);
-    }
-
-    const raw = await response.json();
-
-    // Unwrap TransformInterceptor envelope
-    return this.unwrap<T>(raw);
-  }
-
-  private async requestWithAuth<T>(
-    path: string,
-    init: RequestInit = {},
-    options: { retryOnUnauthorized?: boolean; handleUnauthorized?: boolean } = {},
-  ): Promise<T> {
-    const headers: Record<string, string> = {
-      ...(init.headers as Record<string, string> | undefined),
-    };
-    if (this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
-    }
-
-    let response = await fetch(`${this.baseUrl}${path}`, {
-      ...init,
-      credentials: 'include',
-      headers,
-    });
-
-    // If 401, try refreshing the token once and retry
-    if (response.status === 401 && options.retryOnUnauthorized && this.accessToken) {
-      try {
-        const refreshResult = await this.refreshToken();
-        this.accessToken = refreshResult.accessToken;
-        headers['Authorization'] = `Bearer ${this.accessToken}`;
-
-        const retryResponse = await fetch(`${this.baseUrl}${path}`, {
-          ...init,
-          credentials: 'include',
-          headers,
-        });
-
-        if (!retryResponse.ok) {
-          throw new Error(await this.extractErrorMessage(retryResponse));
-        }
-
-        const raw = await retryResponse.json();
-        return this.unwrap<T>(raw);
-      } catch {
-        // Refresh also failed – throw original 401
-        throw new Error(await this.extractErrorMessage(response));
-      }
-    }
-
-    if (!response.ok) {
-      throw new Error(await this.extractErrorMessage(response));
-    }
-
-    // Handle void responses (e.g. logout)
-    const text = await response.text();
-    if (!text) return undefined as T;
-
-    const raw = JSON.parse(text);
-    return this.unwrap<T>(raw);
+  private async request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+    return requestPublic<T>(this.getRequestContext(), path, options);
   }
 
   private async requestProtected<T>(path: string): Promise<T> {
-    return this.request<T>(path, {
-      retryOnUnauthorized: true,
-      handleUnauthorized: true,
-    });
+    return requestProtectedResource<T>(this.getRequestContext(), path);
   }
 
   private async requestProtectedWithAuth<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const response = await this.fetchProtectedWithAuth(path, init);
-    const text = await response.text();
-    if (!text) return undefined as T;
-
-    const raw = JSON.parse(text);
-    return this.unwrap<T>(raw);
+    return requestProtectedWithAuthResource<T>(this.getRequestContext(), path, init);
   }
 
   private async fetchProtectedWithAuth(path: string, init: RequestInit = {}): Promise<Response> {
-    const headers: Record<string, string> = {
-      ...(init.headers as Record<string, string> | undefined),
-    };
-    if (this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
-    }
-
-    let response = await fetch(`${this.baseUrl}${path}`, {
-      ...init,
-      credentials: 'include',
-      headers,
-    });
-
-    if (response.status === 401 && this.accessToken) {
-      const retryResponse = await this.retryAfterRefresh(`${this.baseUrl}${path}`, {
-        ...init,
-        credentials: 'include',
-        headers,
-      });
-      if (retryResponse) {
-        response = retryResponse;
-      }
-    }
-
-    if (!response.ok) {
-      const message = await this.extractErrorMessage(response);
-      if (response.status === 401) {
-        this.handleUnauthorized();
-        throw new ApiUnauthorizedError(message);
-      }
-      throw new Error(message);
-    }
-
-    return response;
+    return fetchProtectedWithAuthRequest(this.getRequestContext(), path, init);
   }
 
   private async requestProtectedBlob(path: string): Promise<Blob> {
-    const headers: Record<string, string> = {};
-    if (this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
-    }
-
-    let response = await fetch(`${this.baseUrl}${path}`, {
-      credentials: 'include',
-      headers,
-    });
-
-    if (response.status === 401 && this.accessToken) {
-      const retryResponse = await this.retryAfterRefresh(`${this.baseUrl}${path}`, {
-        credentials: 'include',
-        headers,
-      });
-      if (retryResponse) {
-        response = retryResponse;
-      }
-    }
-
-    if (!response.ok) {
-      const message = await this.extractErrorMessage(response);
-      if (response.status === 401) {
-        this.handleUnauthorized();
-        throw new ApiUnauthorizedError(message);
-      }
-      throw new Error(message);
-    }
-
-    return response.blob();
+    return requestProtectedBlobResource(this.getRequestContext(), path);
   }
 
   private async retryAfterRefresh(url: string, init: RequestInit): Promise<Response | null> {
-    try {
-      const refreshResult = await this.refreshToken();
-      this.accessToken = refreshResult.accessToken;
-
-      const retryHeaders: Record<string, string> = {
-        ...((init.headers as Record<string, string> | undefined) ?? {}),
-        Authorization: `Bearer ${this.accessToken}`,
-      };
-
-      return await fetch(url, {
-        ...init,
-        credentials: 'include',
-        headers: retryHeaders,
-      });
-    } catch {
-      return null;
-    }
+    return retryAfterRefreshRequest(this.getRequestContext(), url, init);
   }
 
   private handleUnauthorized(): void {
@@ -814,53 +606,14 @@ export class ApiClient {
   }
 
   private extractRunIdFromLocation(locationHeader?: string | null): string | undefined {
-    if (!locationHeader) {
-      return undefined;
-    }
-
-    const normalizedLocation = locationHeader.replace(/\/$/, '');
-    const segments = normalizedLocation.split('/');
-    const lastSegment = segments[segments.length - 1];
-    return lastSegment || undefined;
+    return extractRunIdFromLocation(locationHeader);
   }
 
-  /**
-   * Unwrap the `{ success, data, timestamp }` envelope added by the backend
-   * TransformInterceptor. If the payload is not wrapped, return it as-is.
-   */
   private unwrap<T>(raw: unknown): T {
-    if (
-      raw &&
-      typeof raw === 'object' &&
-      'success' in (raw as Record<string, unknown>) &&
-      'data' in (raw as Record<string, unknown>)
-    ) {
-      return (raw as ApiEnvelope<T>).data;
-    }
-    return raw as T;
+    return unwrapEnvelope<T>(raw);
   }
 
   private async extractErrorMessage(response: Response): Promise<string> {
-    try {
-      const payload = (await response.json()) as {
-        message?: string | string[];
-        error?: string;
-        statusCode?: number;
-      };
-
-      // GlobalExceptionFilter format: { statusCode, error, correlationId, ... }
-      // ValidationPipe format: { message: string | string[], error: string }
-      const message = Array.isArray(payload.message)
-        ? payload.message.join(', ')
-        : payload.message || payload.error;
-
-      if (message) {
-        return `API ${response.status}: ${message}`;
-      }
-    } catch {
-      // Ignore parse error and fallback to HTTP status text.
-    }
-
-    return `API ${response.status}: ${response.statusText || 'Request failed'}`;
+    return extractErrorMessage(response);
   }
 }

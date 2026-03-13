@@ -1,37 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { CreateProjectModal, ProjectCard } from '../components/projects';
 import { Button, EmptyState } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
+import { useProjects } from '../features/projects/hooks';
 import { isUnauthorizedError } from '../lib/api';
-import type { Project } from '../types/api';
+import { getErrorMessage } from '../shared/utils/error';
 
 export function ProjectsPage() {
   const { api } = useAuth();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { projects, loading, error, prependProject, removeProject } = useProjects();
   const [showCreateModal, setShowCreateModal] = useState(false);
-
-  const fetchProjects = useCallback(async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const response = await api.getProjects({ limit: 50 });
-      setProjects(response.data ?? []);
-    } catch (loadError) {
-      if (isUnauthorizedError(loadError)) {
-        return;
-      }
-      setError(loadError instanceof Error ? loadError.message : 'Failed to load projects');
-    } finally {
-      setLoading(false);
-    }
-  }, [api]);
-
-  useEffect(() => {
-    void fetchProjects();
-  }, [fetchProjects]);
 
   const handleDelete = async (projectId: string) => {
     if (!confirm('Delete this project? This cannot be undone.')) {
@@ -40,12 +18,12 @@ export function ProjectsPage() {
 
     try {
       await api.deleteProject(projectId);
-      setProjects((previous) => previous.filter((project) => project.id !== projectId));
+      removeProject(projectId);
     } catch (deleteError) {
       if (isUnauthorizedError(deleteError)) {
         return;
       }
-      alert(deleteError instanceof Error ? deleteError.message : 'Failed to delete project');
+      alert(getErrorMessage(deleteError, 'Failed to delete project'));
     }
   };
 
@@ -105,7 +83,7 @@ export function ProjectsPage() {
         <CreateProjectModal
           onClose={() => setShowCreateModal(false)}
           onCreated={(project) => {
-            setProjects((previous) => [project, ...previous]);
+            prependProject(project);
             setShowCreateModal(false);
           }}
         />
