@@ -1,9 +1,21 @@
 import { SecurityRuleSelector } from '../SecurityRuleSelector';
-import { Input, TabBar, Textarea } from '../ui';
+import { TabBar } from '../ui';
 import type { CreateEndpointRequest, DataScope, EndpointRoleAccess, RuleSelection } from '../../types/api';
+import type { EnvironmentVariable } from '../../types/environments';
 import { REQUEST_TABS } from './constants';
 import { KeyValueTable } from './KeyValueTable';
-import type { EndpointEditorTab, KVPair } from './types';
+import { FormDataEditor } from './FormDataEditor';
+import { VariableAutocomplete } from './VariableAutocomplete';
+import { ScriptEditor } from './ScriptEditor';
+import type { BodyType, EndpointEditorTab, FormDataRow, KVPair } from './types';
+
+const BODY_TYPE_OPTIONS: { value: BodyType; label: string }[] = [
+  { value: 'none', label: 'none' },
+  { value: 'form-data', label: 'form-data' },
+  { value: 'x-www-form-urlencoded', label: 'x-www-form-urlencoded' },
+  { value: 'raw', label: 'raw JSON' },
+  { value: 'binary', label: 'binary' },
+];
 
 interface EndpointRequestPanelProps {
   activeTab: EndpointEditorTab;
@@ -12,8 +24,15 @@ interface EndpointRequestPanelProps {
   queryRows: KVPair[];
   headerRows: KVPair[];
   bodyText: string;
+  bodyType: BodyType;
+  formDataRows: FormDataRow[];
+  binaryFile: File | null;
   authToken: string;
+  capturedTokenAvailable: boolean;
   selectedRules: RuleSelection;
+  preRequestScript: string;
+  postResponseScript: string;
+  envVariables: EnvironmentVariable[];
   // Access control props
   endpoint: Partial<CreateEndpointRequest>;
   roleAccess: EndpointRoleAccess[];
@@ -24,8 +43,13 @@ interface EndpointRequestPanelProps {
   onQueryRowsChange: (rows: KVPair[]) => void;
   onHeaderRowsChange: (rows: KVPair[]) => void;
   onBodyTextChange: (bodyText: string) => void;
+  onBodyTypeChange: (bodyType: BodyType) => void;
+  onFormDataRowsChange: (rows: FormDataRow[]) => void;
+  onBinaryFileChange: (file: File | null) => void;
   onAuthTokenChange: (authToken: string) => void;
   onRulesChange: (rules: RuleSelection) => void;
+  onPreRequestScriptChange: (script: string) => void;
+  onPostResponseScriptChange: (script: string) => void;
   onEndpointChange: (patch: Partial<CreateEndpointRequest>) => void;
   onRoleAccessChange: (roleId: string, field: 'hasAccess' | 'dataScope', value: boolean | DataScope) => void;
 }
@@ -43,8 +67,15 @@ export function EndpointRequestPanel({
   queryRows,
   headerRows,
   bodyText,
+  bodyType,
+  formDataRows,
+  binaryFile,
   authToken,
+  capturedTokenAvailable,
   selectedRules,
+  preRequestScript,
+  postResponseScript,
+  envVariables,
   endpoint,
   roleAccess,
   roleAccessLoading,
@@ -54,8 +85,13 @@ export function EndpointRequestPanel({
   onQueryRowsChange,
   onHeaderRowsChange,
   onBodyTextChange,
+  onBodyTypeChange,
+  onFormDataRowsChange,
+  onBinaryFileChange,
   onAuthTokenChange,
   onRulesChange,
+  onPreRequestScriptChange,
+  onPostResponseScriptChange,
   onEndpointChange,
   onRoleAccessChange,
 }: EndpointRequestPanelProps) {
@@ -73,18 +109,24 @@ export function EndpointRequestPanel({
           <div className="space-y-4">
             {detectedPathParams.length ? (
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Path Params</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Path Params
+                  <span className="ml-2 font-normal normal-case text-slate-600">
+                    Use {'{{variable}}'} to reference env variables
+                  </span>
+                </p>
                 <div className="space-y-1.5">
                   {detectedPathParams.map((param) => (
                     <div key={param} className="flex items-center gap-2">
                       <span className="w-28 shrink-0 font-mono text-xs text-tide-400">{`{${param}}`}</span>
-                      <Input
+                      <VariableAutocomplete
                         value={pathParams[param] ?? ''}
-                        onChange={(event) =>
-                          onPathParamsChange({ ...pathParams, [param]: event.target.value })
+                        onChange={(val) =>
+                          onPathParamsChange({ ...pathParams, [param]: val })
                         }
-                        placeholder="value"
-                        className="min-w-0 flex-1 rounded-lg px-2.5 py-1.5 font-mono text-xs"
+                        variables={envVariables}
+                        placeholder="value or {{variable}}"
+                        className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-tide-400/50"
                       />
                     </div>
                   ))}
@@ -102,28 +144,136 @@ export function EndpointRequestPanel({
         {activeTab === 'headers' ? <KeyValueTable rows={headerRows} onChange={onHeaderRowsChange} /> : null}
 
         {activeTab === 'body' ? (
-          <div>
-            <p className="mb-2 text-xs text-slate-500">Content-Type: application/json</p>
-            <Textarea
-              value={bodyText}
-              onChange={(event) => onBodyTextChange(event.target.value)}
-              rows={12}
-              placeholder='{"key": "value"}'
-              className="bg-black/30 p-3 font-mono text-sm"
-            />
+          <div className="space-y-3">
+            {/* Body type selector */}
+            <div className="flex flex-wrap gap-1">
+              {BODY_TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => onBodyTypeChange(opt.value)}
+                  className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-all ${
+                    bodyType === opt.value
+                      ? 'border-tide-500/50 bg-tide-500/10 text-tide-300'
+                      : 'border-white/10 text-slate-500 hover:text-slate-400'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {bodyType === 'none' && (
+              <p className="py-8 text-center text-xs text-slate-500">
+                This request does not have a body.
+              </p>
+            )}
+
+            {bodyType === 'raw' && (
+              <div>
+                <p className="mb-2 text-xs text-slate-500">Content-Type: application/json — Use {'{{variable}}'} for env variables</p>
+                <VariableAutocomplete
+                  value={bodyText}
+                  onChange={onBodyTextChange}
+                  variables={envVariables}
+                  multiline
+                  rows={12}
+                  placeholder='{"key": "{{variable}}"}'
+                  className="w-full rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-slate-200 outline-none focus:border-tide-400/50"
+                />
+              </div>
+            )}
+
+            {bodyType === 'form-data' && (
+              <div>
+                <p className="mb-2 text-xs text-slate-500">Content-Type: multipart/form-data</p>
+                <FormDataEditor rows={formDataRows} onChange={onFormDataRowsChange} />
+              </div>
+            )}
+
+            {bodyType === 'x-www-form-urlencoded' && (
+              <div>
+                <p className="mb-2 text-xs text-slate-500">Content-Type: application/x-www-form-urlencoded</p>
+                <KeyValueTable
+                  rows={formDataRows.map((r) => ({ key: r.key, value: r.value, enabled: r.enabled }))}
+                  onChange={(rows) =>
+                    onFormDataRowsChange(rows.map((r) => ({ ...r, type: 'text' as const })))
+                  }
+                />
+              </div>
+            )}
+
+            {bodyType === 'binary' && (
+              <div>
+                <p className="mb-2 text-xs text-slate-500">Binary file upload</p>
+                <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 px-4 py-8 text-sm text-slate-500 transition-colors hover:border-white/20 hover:text-slate-400">
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => onBinaryFileChange(e.target.files?.[0] ?? null)}
+                  />
+                  {binaryFile ? binaryFile.name : 'Click to select a file'}
+                </label>
+              </div>
+            )}
           </div>
         ) : null}
 
         {activeTab === 'auth' ? (
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Bearer Token</p>
-            <Input
+            <VariableAutocomplete
               value={authToken}
-              onChange={(event) => onAuthTokenChange(event.target.value)}
-              placeholder="eyJ..."
-              className="font-mono"
+              onChange={onAuthTokenChange}
+              variables={envVariables}
+              placeholder="eyJ... or {{token}}"
+              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-200 outline-none focus:border-tide-400/50"
             />
-            <p className="mt-2 text-xs text-slate-500">Overrides project auth for this request only.</p>
+            <p className="mt-2 text-xs text-slate-500">Overrides project auth for this request only. Use {'{{token}}'} to reference an env variable.</p>
+            {capturedTokenAvailable && !authToken && (
+              <p className="mt-2 rounded-lg border border-tide-500/20 bg-tide-500/5 px-3 py-2 text-xs text-tide-300">
+                A captured token from a login request is available and will be used automatically.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {activeTab === 'scripts' ? (
+          <div className="space-y-4">
+            {/* API Reference */}
+            <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">API Reference — Compatible with Postman syntax</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[10px]">
+                <span><code className="text-tide-400">pm.environment.set(<span className="text-amber-400">"key"</span>, <span className="text-amber-400">"val"</span>)</code></span>
+                <span><code className="text-tide-400">pm.environment.get(<span className="text-amber-400">"key"</span>)</code></span>
+                <span><code className="text-tide-400">pm.response.json()</code></span>
+                <span><code className="text-tide-400">pm.response.code</code></span>
+                <span><code className="text-tide-400">console.log(<span className="text-amber-400">...</span>)</code></span>
+              </div>
+              <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[10px] text-slate-600">
+                <span>Also: <code className="text-slate-500">env.set()</code> / <code className="text-slate-500">env.get()</code> / <code className="text-slate-500">response.json()</code> / <code className="text-slate-500">response.status</code> / <code className="text-slate-500">log()</code></span>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Pre-request Script</p>
+              <ScriptEditor
+                value={preRequestScript}
+                onChange={onPreRequestScriptChange}
+                placeholder="// Runs before the request. Example:\n// env.set('timestamp', Date.now().toString());"
+                minHeight="120px"
+              />
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Post-response Script</p>
+              <ScriptEditor
+                value={postResponseScript}
+                onChange={onPostResponseScriptChange}
+                placeholder="// Runs after response. Example:\n// let data = pm.response.json();\n// if (pm.response.code == 200) {\n//   pm.environment.set('token', data.access_token);\n//   console.log('Token captured!');\n// }"
+                minHeight="180px"
+              />
+            </div>
           </div>
         ) : null}
 

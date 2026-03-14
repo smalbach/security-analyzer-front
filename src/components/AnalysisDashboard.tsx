@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { isUnauthorizedError } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { AnalysisHistoryItem, PaginatedResponse } from '../types/api';
+import { PageSizeSelector } from './ui';
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-amber-500/20 text-amber-100 border-amber-300/40',
@@ -26,6 +27,7 @@ export function AnalysisDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(30);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const previousDebouncedSearchRef = useRef(debouncedSearch);
@@ -42,7 +44,7 @@ export function AnalysisDashboard() {
     try {
       const result = await api.getHistory({
         page,
-        limit: 15,
+        limit: pageSize,
         projectName: debouncedSearch || undefined,
         sortBy: 'startedAt',
         sortOrder: 'DESC',
@@ -56,7 +58,7 @@ export function AnalysisDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [api, page, debouncedSearch]);
+  }, [api, page, pageSize, debouncedSearch]);
 
   useEffect(() => {
     const searchChanged = previousDebouncedSearchRef.current !== debouncedSearch;
@@ -69,6 +71,11 @@ export function AnalysisDashboard() {
 
     void fetchHistory();
   }, [debouncedSearch, fetchHistory, page]);
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setPage(1);
+  };
 
   const items = data?.data ?? [];
   const meta = data?.meta;
@@ -222,11 +229,14 @@ export function AnalysisDashboard() {
         )}
 
         {/* Pagination */}
-        {meta && meta.totalPages > 1 ? (
+        {meta ? (
           <div className="flex items-center justify-between border-t border-white/10 px-4 py-3 text-sm text-slate-300">
-            <span>
-              Page {meta.page} of {meta.totalPages} ({meta.total} total)
-            </span>
+            <div className="flex items-center gap-4">
+              <span>
+                Page {meta.page} of {meta.totalPages} ({meta.total} total)
+              </span>
+              <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} disabled={loading} />
+            </div>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -247,6 +257,7 @@ export function AnalysisDashboard() {
             </div>
           </div>
         ) : null}
+
       </section>
     </div>
   );

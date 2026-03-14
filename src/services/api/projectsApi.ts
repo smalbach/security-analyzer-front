@@ -15,11 +15,12 @@ export async function createProject(
 
 export async function getProjects(
   context: ApiRequestContext,
-  params?: { page?: number; limit?: number },
+  params?: { page?: number; limit?: number; archived?: boolean },
 ): Promise<{ data: Project[] }> {
   const query = new URLSearchParams();
   if (params?.page !== undefined) query.set('page', String(params.page));
   if (params?.limit !== undefined) query.set('limit', String(params.limit));
+  if (params?.archived !== undefined) query.set('archived', String(params.archived));
   const qs = query.toString();
 
   const result = await requestProtected<Project[] | { data: Project[] }>(
@@ -43,6 +44,14 @@ export async function updateProject(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
+}
+
+export async function archiveProject(context: ApiRequestContext, id: string): Promise<Project> {
+  return requestProtectedWithAuth<Project>(context, `/projects/${id}/archive`, { method: 'PATCH' });
+}
+
+export async function unarchiveProject(context: ApiRequestContext, id: string): Promise<Project> {
+  return requestProtectedWithAuth<Project>(context, `/projects/${id}/unarchive`, { method: 'PATCH' });
 }
 
 export async function deleteProject(context: ApiRequestContext, id: string): Promise<void> {

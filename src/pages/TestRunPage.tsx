@@ -14,13 +14,13 @@ import {
   summarizeFilteredTestRunResults,
   type TestRunFilterState,
 } from '../components/test-run';
-import { Button, EmptyState, LinkButton } from '../components/ui';
+import { Button, EmptyState, LinkButton, PageSizeSelector } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { isUnauthorizedError } from '../lib/api';
 import { TEST_RUN_STATUS_BADGE } from '../lib/testRuns';
 import type { EndpointTestResult, PaginatedTestRunResults, ReportFormat, TestRun } from '../types/api';
 
-const PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 50;
 
 export function TestRunPage() {
   const { projectId, runId } = useParams<{ projectId: string; runId: string }>();
@@ -31,6 +31,7 @@ export function TestRunPage() {
   // Paginated endpoint results — only fetched after completion
   const [paginatedResults, setPaginatedResults] = useState<PaginatedTestRunResults | null>(null);
   const [resultsLoading, setResultsLoading] = useState(false);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -45,11 +46,11 @@ export function TestRunPage() {
   };
 
   /** Fetch paginated results for a completed run */
-  const fetchResults = useCallback(async (page: number) => {
+  const fetchResults = useCallback(async (page: number, limit = pageSize) => {
     if (!projectId || !runId) return;
     setResultsLoading(true);
     try {
-      const data = await api.getTestRunResults(projectId, runId, { page, limit: PAGE_SIZE });
+      const data = await api.getTestRunResults(projectId, runId, { page, limit });
       setPaginatedResults(data);
     } catch (err) {
       if (isUnauthorizedError(err)) return;
@@ -57,7 +58,7 @@ export function TestRunPage() {
     } finally {
       setResultsLoading(false);
     }
-  }, [api, projectId, runId]);
+  }, [api, projectId, runId, pageSize]);
 
   /** Poll lightweight status while running; load full data on first load or completion */
   const fetchRun = useCallback(async () => {
@@ -93,6 +94,11 @@ export function TestRunPage() {
   const handlePageChange = async (page: number) => {
     await fetchResults(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    void fetchResults(1, size);
   };
 
   const handleDownload = async (format: ReportFormat) => {
@@ -238,6 +244,7 @@ export function TestRunPage() {
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-semibold text-slate-200">Endpoint Results</h2>
             <div className="flex items-center gap-3 text-sm text-slate-500">
+              <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} disabled={resultsLoading} />
               {pagination && pagination.totalPages > 1 ? (
                 <span>
                   Page {pagination.page} / {pagination.totalPages} ({totalEndpoints} endpoints)

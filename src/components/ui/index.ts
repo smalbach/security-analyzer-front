@@ -11,6 +11,7 @@ export * from './Input';
 export * from './LinkButton';
 export * from './MetricCard';
 export * from './Modal';
+export * from './PageSizeSelector';
 export * from './Select';
 export * from './TabBar';
 export * from './Textarea';

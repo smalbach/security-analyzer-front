@@ -12,9 +12,9 @@ import {
 import type { EndpointTreeNode } from '../../lib/endpointTree';
 import { useEndpointSelectionStore } from '../../stores/endpointSelectionStore';
 import type { ApiEndpoint, PaginatedEndpointsResponse, Project } from '../../types/api';
-import { Button, EmptyState, Input } from '../ui';
+import { Button, EmptyState, Input, PageSizeSelector } from '../ui';
 
-const PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 100;
 
 const METHOD_COLOR: Record<string, string> = {
   GET: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
@@ -67,6 +67,7 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
@@ -87,12 +88,12 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
     isSelected,
   } = useEndpointSelectionStore();
 
-  const fetchEndpoints = useCallback(async (page: number, searchTerm: string) => {
+  const fetchEndpoints = useCallback(async (page: number, searchTerm: string, limit = pageSize) => {
     setLoading(true);
     try {
       const response = await api.getEndpoints(project.id, {
         page,
-        limit: PAGE_SIZE,
+        limit,
         search: searchTerm || undefined,
       });
       const result = response as PaginatedEndpointsResponse;
@@ -106,7 +107,7 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [api, project.id, setProject]);
+  }, [api, project.id, setProject, pageSize]);
 
   useEffect(() => {
     void fetchEndpoints(1, '');
@@ -127,6 +128,11 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
 
   const handlePageChange = async (page: number) => {
     await fetchEndpoints(page, search);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    void fetchEndpoints(1, search, size);
   };
 
   const handleImportFile = async () => {
@@ -400,6 +406,7 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
               >
                 Select all on page
               </button>
+              <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} disabled={loading} />
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
                 {pagination?.total ?? endpoints.length} total
               </span>

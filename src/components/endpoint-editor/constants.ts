@@ -18,6 +18,7 @@ export const REQUEST_TABS: { id: EndpointEditorTab; label: string }[] = [
   { id: 'headers', label: 'Headers' },
   { id: 'body', label: 'Body' },
   { id: 'auth', label: 'Auth' },
+  { id: 'scripts', label: 'Scripts' },
   { id: 'access', label: 'Access Control' },
   { id: 'security', label: 'Security Rules' },
 ];
@@ -25,6 +26,7 @@ export const REQUEST_TABS: { id: EndpointEditorTab; label: string }[] = [
 export const RESPONSE_TABS: { id: ResponseTab; label: string }[] = [
   { id: 'body', label: 'Body' },
   { id: 'headers', label: 'Headers' },
+  { id: 'console', label: 'Console' },
 ];
 
 export function getResponseStatusColor(code: number) {

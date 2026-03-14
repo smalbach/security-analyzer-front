@@ -35,6 +35,9 @@ import type {
   PerfRunSummary,
   PerfComparisonReport,
   CreatePerfComparisonRequest,
+  ProjectEnvironment,
+  CreateEnvironmentRequest,
+  UpdateEnvironmentRequest,
 } from '../types/api';
 import {
   forgotPassword as forgotPasswordRequest,
@@ -46,10 +49,12 @@ import {
   resetPassword as resetPasswordRequest,
 } from '../services/api/authApi';
 import {
+  archiveProject as archiveProjectRequest,
   createProject as createProjectRequest,
   deleteProject as deleteProjectRequest,
   getProject as getProjectRequest,
   getProjects as getProjectsRequest,
+  unarchiveProject as unarchiveProjectRequest,
   updateProject as updateProjectRequest,
 } from '../services/api/projectsApi';
 import { ApiUnauthorizedError, isUnauthorizedError } from '../services/http/errors';
@@ -156,7 +161,7 @@ export class ApiClient {
     return createProjectRequest(this.getRequestContext(), data);
   }
 
-  async getProjects(params?: { page?: number; limit?: number }) {
+  async getProjects(params?: { page?: number; limit?: number; archived?: boolean }) {
     return getProjectsRequest(this.getRequestContext(), params);
   }
 
@@ -166,6 +171,14 @@ export class ApiClient {
 
   async updateProject(id: string, data: UpdateProjectRequest) {
     return updateProjectRequest(this.getRequestContext(), id, data);
+  }
+
+  async archiveProject(id: string) {
+    return archiveProjectRequest(this.getRequestContext(), id);
+  }
+
+  async unarchiveProject(id: string) {
+    return unarchiveProjectRequest(this.getRequestContext(), id);
   }
 
   async deleteProject(id: string): Promise<void> {
@@ -318,6 +331,137 @@ export class ApiClient {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
+      },
+    );
+  }
+
+  async testEndpointMultipart(
+    projectId: string,
+    endpointId: string,
+    data: {
+      pathParams?: Record<string, string>;
+      queryParams?: Record<string, string>;
+      headers?: Record<string, string>;
+      formFields?: Array<{ key: string; value: string }>;
+      files?: Array<{ fieldName: string; file: File }>;
+      authToken?: string;
+      baseUrl?: string;
+      environmentId?: string;
+    },
+  ): Promise<TestEndpointResponse> {
+    const formData = new FormData();
+
+    if (data.pathParams) formData.append('pathParams', JSON.stringify(data.pathParams));
+    if (data.queryParams) formData.append('queryParams', JSON.stringify(data.queryParams));
+    if (data.headers) formData.append('headers', JSON.stringify(data.headers));
+    if (data.formFields) formData.append('formFields', JSON.stringify(data.formFields));
+    if (data.authToken) formData.append('authToken', data.authToken);
+    if (data.baseUrl) formData.append('baseUrl', data.baseUrl);
+    if (data.environmentId) formData.append('environmentId', data.environmentId);
+
+    const fileFieldNames: string[] = [];
+    if (data.files) {
+      for (const { fieldName, file } of data.files) {
+        formData.append('files', file);
+        fileFieldNames.push(fieldName);
+      }
+    }
+    formData.append('fileFieldNames', JSON.stringify(fileFieldNames));
+
+    const headers: Record<string, string> = {};
+    if (this.accessToken) {
+      headers.Authorization = `Bearer ${this.accessToken}`;
+    }
+
+    let response = await fetch(
+      `${this.baseUrl}/projects/${projectId}/endpoints/${endpointId}/test-multipart`,
+      { method: 'POST', body: formData, credentials: 'include', headers },
+    );
+
+    if (response.status === 401 && this.accessToken) {
+      const retryResponse = await this.retryAfterRefresh(
+        `${this.baseUrl}/projects/${projectId}/endpoints/${endpointId}/test-multipart`,
+        { method: 'POST', body: formData, credentials: 'include', headers },
+      );
+      if (retryResponse) response = retryResponse;
+    }
+
+    if (!response.ok) {
+      const message = await this.extractErrorMessage(response);
+      if (response.status === 401) {
+        this.handleUnauthorized();
+        throw new ApiUnauthorizedError(message);
+      }
+      throw new Error(message);
+    }
+
+    return this.unwrap<TestEndpointResponse>(await response.json());
+  }
+
+  // ─── Environments ──────────────────────────────────────────────────────
+
+  async getEnvironments(projectId: string): Promise<ProjectEnvironment[]> {
+    const result = await this.requestProtected<ProjectEnvironment[] | { data: ProjectEnvironment[] }>(
+      `/projects/${projectId}/environments`,
+    );
+    return Array.isArray(result) ? result : result.data;
+  }
+
+  async createEnvironment(projectId: string, data: CreateEnvironmentRequest): Promise<ProjectEnvironment> {
+    return this.requestProtectedWithAuth<ProjectEnvironment>(`/projects/${projectId}/environments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getActiveEnvironment(projectId: string): Promise<ProjectEnvironment | null> {
+    try {
+      return await this.requestProtected<ProjectEnvironment>(`/projects/${projectId}/environments/active`);
+    } catch {
+      return null;
+    }
+  }
+
+  async getEnvironment(projectId: string, envId: string, reveal = false): Promise<ProjectEnvironment> {
+    const qs = reveal ? '?reveal=true' : '';
+    return this.requestProtected<ProjectEnvironment>(
+      `/projects/${projectId}/environments/${envId}${qs}`,
+    );
+  }
+
+  async updateEnvironment(projectId: string, envId: string, data: UpdateEnvironmentRequest): Promise<ProjectEnvironment> {
+    return this.requestProtectedWithAuth<ProjectEnvironment>(
+      `/projects/${projectId}/environments/${envId}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      },
+    );
+  }
+
+  async deleteEnvironment(projectId: string, envId: string): Promise<void> {
+    return this.requestProtectedWithAuth<void>(
+      `/projects/${projectId}/environments/${envId}`,
+      { method: 'DELETE' },
+    );
+  }
+
+  async activateEnvironment(projectId: string, envId: string): Promise<ProjectEnvironment> {
+    return this.requestProtectedWithAuth<ProjectEnvironment>(
+      `/projects/${projectId}/environments/${envId}/activate`,
+      { method: 'PATCH' },
+    );
+  }
+
+  async updateVariableValues(projectId: string, envId: string, updates: Record<string, string>): Promise<void> {
+    return this.requestProtectedWithAuth<void>(
+      `/projects/${projectId}/environments/${envId}/variables`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
       },
     );
   }

@@ -66,6 +66,7 @@ export interface TestEndpointRequest {
   authToken?: string;
   baseUrl?: string;
   rules?: string[];
+  environmentId?: string;
 }
 
 export interface TestEndpointResponse {
@@ -76,6 +77,8 @@ export interface TestEndpointResponse {
   durationMs: number;
   url: string;
   method: string;
+  capturedToken?: string;
+  resolvedUrl?: string;
 }
 
 export interface ImportResult {

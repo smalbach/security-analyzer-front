@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { cn } from '../../lib/cn';
+import { PageSizeSelector } from './PageSizeSelector';
 
 interface Column<T> {
   key: string;
@@ -33,8 +34,14 @@ export function DataTable<T>({
   className,
 }: DataTableProps<T>) {
   const [page, setPage] = useState(1);
-  const totalPages = Math.ceil(data.length / pageSize);
-  const items = data.slice((page - 1) * pageSize, page * pageSize);
+  const [currentPageSize, setCurrentPageSize] = useState(pageSize);
+  const totalPages = Math.ceil(data.length / currentPageSize);
+  const items = data.slice((page - 1) * currentPageSize, page * currentPageSize);
+
+  const handlePageSizeChange = (size: number) => {
+    setCurrentPageSize(size);
+    setPage(1);
+  };
 
   return (
     <div className={cn('dash-card', className)}>
@@ -79,10 +86,13 @@ export function DataTable<T>({
 
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-              <span>
-                Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, data.length)} of{' '}
-                {data.length}
-              </span>
+              <div className="flex items-center gap-4">
+                <span>
+                  Showing {(page - 1) * currentPageSize + 1} to {Math.min(page * currentPageSize, data.length)} of{' '}
+                  {data.length}
+                </span>
+                <PageSizeSelector value={currentPageSize} onChange={handlePageSizeChange} />
+              </div>
               <div className="flex items-center gap-1">
                 <button
                   type="button"

@@ -2,6 +2,7 @@ export * from './analysis';
 export * from './auth';
 export * from './common';
 export * from './endpoints';
+export * from './environments';
 export * from './performance';
 export * from './projects';
 export * from './roles';

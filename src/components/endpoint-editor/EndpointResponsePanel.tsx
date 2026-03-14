@@ -7,6 +7,8 @@ interface EndpointResponsePanelProps {
   sending: boolean;
   response: TestEndpointResponse | null;
   responseTab: ResponseTab;
+  scriptLogs: string[];
+  scriptError?: string;
   onResponseTabChange: (tab: ResponseTab) => void;
 }
 
@@ -14,6 +16,8 @@ export function EndpointResponsePanel({
   sending,
   response,
   responseTab,
+  scriptLogs,
+  scriptError,
   onResponseTabChange,
 }: EndpointResponsePanelProps) {
   return (
@@ -68,6 +72,26 @@ export function EndpointResponsePanel({
                   <span className="break-all text-slate-300">{value}</span>
                 </div>
               ))}
+            </div>
+          ) : null}
+
+          {responseTab === 'console' ? (
+            <div className="max-h-80 overflow-auto rounded-xl bg-black/30 p-3 font-mono text-xs">
+              {scriptError && (
+                <div className="mb-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-red-400">
+                  Script Error: {scriptError}
+                </div>
+              )}
+              {scriptLogs.length === 0 && !scriptError ? (
+                <p className="text-slate-600">No console output. Use log() in your scripts to see output here.</p>
+              ) : (
+                scriptLogs.map((line, i) => (
+                  <div key={i} className="text-slate-300">
+                    <span className="mr-2 text-slate-600">{`>`}</span>
+                    {line}
+                  </div>
+                ))
+              )}
             </div>
           ) : null}
         </div>

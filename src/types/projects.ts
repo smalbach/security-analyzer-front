@@ -8,6 +8,11 @@ export interface Project {
   baseUrl: string | null;
   authConfig: AuthConfig | null;
   tags: string[];
+  isArchived: boolean;
+  lastRunSummary?: {
+    securityScore?: number;
+    globalRiskLevel?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }

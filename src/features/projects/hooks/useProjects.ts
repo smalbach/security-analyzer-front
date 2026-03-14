@@ -4,6 +4,10 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { isUnauthorizedError } from '../../../lib/api';
 import { getErrorMessage } from '../../../shared/utils/error';
 
+interface UseProjectsOptions {
+  archived?: boolean;
+}
+
 interface UseProjectsResult {
   projects: Project[];
   loading: boolean;
@@ -13,7 +17,7 @@ interface UseProjectsResult {
   removeProject: (projectId: string) => void;
 }
 
-export function useProjects(): UseProjectsResult {
+export function useProjects({ archived = false }: UseProjectsOptions = {}): UseProjectsResult {
   const { api } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +28,7 @@ export function useProjects(): UseProjectsResult {
     setError('');
 
     try {
-      const response = await api.getProjects({ limit: 50 });
+      const response = await api.getProjects({ limit: 50, archived });
       setProjects(response.data ?? []);
     } catch (loadError) {
       if (isUnauthorizedError(loadError)) {
@@ -35,7 +39,7 @@ export function useProjects(): UseProjectsResult {
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, archived]);
 
   useEffect(() => {
     void refetch();
