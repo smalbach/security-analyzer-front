@@ -3,9 +3,11 @@ import { ThemePicker } from './app/ThemePicker';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { getThemeOption } from '../contexts/themeOptions';
+import { useActiveProject } from '../contexts/ActiveProjectContext';
 import { cn } from '../lib/cn';
 
 const AUTH_NAV_ITEMS = [
+  { to: '/dashboard/ecommerce', label: 'Dashboard' },
   { to: '/projects', label: 'Projects' },
   { to: '/history', label: 'History' },
 ];
@@ -23,6 +25,7 @@ export function NavHeader() {
   const { theme } = useTheme();
   const { user, isAuthenticated, logout } = useAuth();
   const activeTheme = getThemeOption(theme);
+  const { activeProject } = useActiveProject();
 
   return (
     <nav className="app-nav-shell">
@@ -52,13 +55,19 @@ export function NavHeader() {
                   {item.label}
                 </NavLink>
               ))}
+              {activeProject ? (
+                <div className="app-nav-breadcrumb">
+                  <span className="app-nav-breadcrumb-sep">›</span>
+                  <span className="app-nav-breadcrumb-current" title={activeProject.name}>
+                    {activeProject.name}
+                  </span>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <ThemePicker />
-
           {isAuthenticated ? (
             <div className="app-nav-cluster flex flex-wrap items-center gap-2">
               <span className="app-user-chip">{user?.name}</span>
@@ -79,6 +88,8 @@ export function NavHeader() {
               ))}
             </div>
           )}
+
+          <ThemePicker />
         </div>
       </div>
     </nav>

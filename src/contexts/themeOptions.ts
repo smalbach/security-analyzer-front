@@ -1,4 +1,4 @@
-export const THEME_NAMES = ['cyber', 'mission', 'forensic', 'matrix'] as const;
+export const THEME_NAMES = ['cyber', 'mission', 'forensic', 'matrix', 'paces'] as const;
 export const THEME_MODES = ['light', 'dark'] as const;
 
 export type ThemeName = (typeof THEME_NAMES)[number];
@@ -26,7 +26,7 @@ export const THEME_OPTIONS: ThemeOption[] = [
     accentLabel: 'Adaptive ops',
     preview:
       'linear-gradient(135deg, rgba(8,29,46,0.98), rgba(17,54,78,0.9) 48%, rgba(249,115,22,0.28) 100%)',
-    modes: ['dark'],
+    modes: ['light', 'dark'],
     defaultMode: 'dark',
   },
   {
@@ -44,10 +44,10 @@ export const THEME_OPTIONS: ThemeOption[] = [
     value: 'forensic',
     label: 'Forensic Report',
     shortLabel: 'Forensic',
-    description: 'Android-inspired Material interface with tonal surfaces, soft elevation, and tactile controls.',
-    accentLabel: 'Android UI',
+    description: 'Warm Material surfaces with moss accents, rounded cards, and soft pill controls.',
+    accentLabel: 'Material Me',
     preview:
-      'linear-gradient(135deg, rgba(245,241,248,1), rgba(255,251,254,0.98) 54%, rgba(123,116,246,0.18) 82%, rgba(129,204,196,0.14) 100%)',
+      'linear-gradient(135deg, rgba(248,246,239,1), rgba(252,249,242,0.98) 56%, rgba(149,167,85,0.17) 82%, rgba(204,165,107,0.12) 100%)',
     modes: ['light', 'dark'],
     defaultMode: 'light',
   },
@@ -60,6 +60,17 @@ export const THEME_OPTIONS: ThemeOption[] = [
     preview:
       'linear-gradient(135deg, rgba(0,0,0,1), rgba(5,20,5,0.96) 52%, rgba(0,255,65,0.22) 100%)',
     modes: ['dark'],
+    defaultMode: 'dark',
+  },
+  {
+    value: 'paces',
+    label: 'Paces',
+    shortLabel: 'Paces',
+    description: 'Clean enterprise admin with emerald sidebar and warm card surfaces.',
+    accentLabel: 'Enterprise',
+    preview:
+      'linear-gradient(135deg, rgba(55,75,62,0.98), rgba(42,58,48,0.9) 48%, rgba(79,166,127,0.3) 100%)',
+    modes: ['light', 'dark'],
     defaultMode: 'dark',
   },
 ];

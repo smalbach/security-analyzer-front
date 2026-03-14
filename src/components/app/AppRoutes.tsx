@@ -1,7 +1,9 @@
 import { Route, Routes } from 'react-router-dom';
 import { AnalysisDashboard } from '../AnalysisDashboard';
 import { ProtectedRoute } from '../ProtectedRoute';
+import { ProjectShell } from './ProjectShell';
 import { AnalysisPage } from '../../pages/AnalysisPage';
+import { EcommerceDashboardPage } from '../../pages/EcommerceDashboardPage';
 import { EndpointEditorPage } from '../../pages/EndpointEditorPage';
 import { ForgotPasswordPage } from '../../pages/ForgotPasswordPage';
 import { LoginPage } from '../../pages/LoginPage';
@@ -12,6 +14,7 @@ import { RegisterPage } from '../../pages/RegisterPage';
 import { ReportPage } from '../../pages/ReportPage';
 import { ResetPasswordPage } from '../../pages/ResetPasswordPage';
 import { TestRunPage } from '../../pages/TestRunPage';
+import { PerfExecutionPage } from '../../pages/PerfExecutionPage';
 
 export function AppRoutes() {
   return (
@@ -41,26 +44,15 @@ export function AppRoutes() {
         path="/projects/:projectId"
         element={(
           <ProtectedRoute>
-            <ProjectDetailPage />
+            <ProjectShell />
           </ProtectedRoute>
         )}
-      />
-      <Route
-        path="/projects/:projectId/endpoints/:endpointId"
-        element={(
-          <ProtectedRoute>
-            <EndpointEditorPage />
-          </ProtectedRoute>
-        )}
-      />
-      <Route
-        path="/projects/:projectId/test-runs/:runId"
-        element={(
-          <ProtectedRoute>
-            <TestRunPage />
-          </ProtectedRoute>
-        )}
-      />
+      >
+        <Route index element={<ProjectDetailPage />} />
+        <Route path="endpoints/:endpointId" element={<EndpointEditorPage />} />
+        <Route path="test-runs/:runId" element={<TestRunPage />} />
+        <Route path="perf-executions/:execId" element={<PerfExecutionPage />} />
+      </Route>
       <Route
         path="/analysis/new"
         element={(
@@ -77,6 +69,8 @@ export function AppRoutes() {
           </ProtectedRoute>
         )}
       />
+
+      <Route path="/dashboard/ecommerce" element={<ProtectedRoute><EcommerceDashboardPage /></ProtectedRoute>} />
 
       <Route path="/analysis/:id" element={<ReportPage />} />
       <Route path="*" element={<NotFoundPage />} />

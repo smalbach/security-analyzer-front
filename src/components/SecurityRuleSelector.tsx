@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { RuleSelection } from '../types/api';
-import { Button } from './ui';
+import { Button, HelpTooltip } from './ui';
 
 interface RuleConfig {
   key: keyof RuleSelection;
@@ -110,11 +110,15 @@ export function SecurityRuleSelector({ value, onChange, defaultCollapsed = false
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center justify-between px-4 py-3 text-left"
       >
-        <span className="font-medium text-slate-200">
+        <span className="flex items-center gap-2 font-medium text-slate-200">
           Security Rules
-          <span className="ml-2 rounded-full bg-tide-500/20 px-2 py-0.5 text-xs text-tide-300">
+          <span className="rounded-full bg-tide-500/20 px-2 py-0.5 text-xs text-tide-300">
             {selectedCount}/{ALL_KEYS.length}
           </span>
+          <HelpTooltip
+            content="Security rules are checks that detect specific vulnerabilities. Enable all for maximum coverage."
+            position="right"
+          />
         </span>
         <span className="text-slate-400">{expanded ? '▲' : '▼'}</span>
       </button>

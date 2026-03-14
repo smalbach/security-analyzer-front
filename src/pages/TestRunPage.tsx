@@ -20,7 +20,7 @@ import { isUnauthorizedError } from '../lib/api';
 import { TEST_RUN_STATUS_BADGE } from '../lib/testRuns';
 import type { EndpointTestResult, PaginatedTestRunResults, ReportFormat, TestRun } from '../types/api';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 export function TestRunPage() {
   const { projectId, runId } = useParams<{ projectId: string; runId: string }>();

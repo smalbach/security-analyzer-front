@@ -65,7 +65,7 @@ export default {
         glitch: 'glitch 3s ease-in-out infinite',
       },
       boxShadow: {
-        glass: '0 18px 45px -22px var(--shadow-color, rgba(6, 22, 35, 0.95))',
+        glass: '0 18px 45px -22px var(--shadow-color, rgba(10, 14, 42, 0.95))',
         'matrix-glow': '0 0 15px rgba(0, 255, 65, 0.15), 0 0 30px rgba(0, 255, 65, 0.05)',
       },
     },

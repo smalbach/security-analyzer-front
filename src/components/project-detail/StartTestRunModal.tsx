@@ -11,7 +11,7 @@ import type {
   TestRun,
 } from '../../types/api';
 import { SecurityRuleSelector } from '../SecurityRuleSelector';
-import { Button, FormField, Input, Modal } from '../ui';
+import { Button, FormField, HelpTooltip, Input, Modal } from '../ui';
 import { EndpointSelectorPanel } from './EndpointSelectorPanel';
 import { TestRunExecutionOptions } from './TestRunExecutionOptions';
 import { DEFAULT_TEST_RUN_EXECUTION_OPTIONS, buildStartTestRunPayload } from './testRunForm';
@@ -218,7 +218,13 @@ export function StartTestRunModal({
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-sm text-slate-400">Test Credentials</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm text-slate-400">Test Credentials</p>
+                <HelpTooltip
+                  content="Add test user accounts so the scanner can test authenticated endpoints. Use dedicated test accounts, not real credentials."
+                  position="right"
+                />
+              </div>
               <p className="text-xs text-slate-500">
                 Add one or more accounts to exercise authorization checks and cross-user flows.
               </p>

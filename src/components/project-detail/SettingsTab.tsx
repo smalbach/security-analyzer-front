@@ -3,7 +3,7 @@ import { ProjectAuthConfigFields, buildAuthConfigPayload, getAuthConfigLoginBody
 import { useAuth } from '../../contexts/AuthContext';
 import { isUnauthorizedError } from '../../lib/api';
 import type { AuthConfig, Project } from '../../types/api';
-import { Button, FormField, Input, Textarea } from '../ui';
+import { Button, FormField, HelpTooltip, Input, Textarea } from '../ui';
 
 interface SettingsTabProps {
   project: Project;
@@ -86,7 +86,11 @@ export function SettingsTab({ project, onUpdated }: SettingsTabProps) {
         />
       </FormField>
 
-      <FormField label="Base URL" htmlFor="project-base-url">
+      <div>
+        <div className="mb-1 flex items-center gap-1.5">
+          <label htmlFor="project-base-url" className="text-sm text-slate-400">Base URL</label>
+          <HelpTooltip content="The root URL of your API, e.g. https://api.myapp.com — all endpoint paths are appended to this." />
+        </div>
         <Input
           id="project-base-url"
           value={form.baseUrl}
@@ -94,7 +98,7 @@ export function SettingsTab({ project, onUpdated }: SettingsTabProps) {
           className="font-mono"
           placeholder="https://api.example.com"
         />
-      </FormField>
+      </div>
 
       <FormField label="Tags (comma separated)" htmlFor="project-tags">
         <Input
@@ -105,14 +109,23 @@ export function SettingsTab({ project, onUpdated }: SettingsTabProps) {
         />
       </FormField>
 
-      <ProjectAuthConfigFields
-        authType={authType}
-        authConfig={authConfig}
-        loginBodyText={loginBodyText}
-        onAuthTypeChange={setAuthType}
-        onAuthConfigChange={(patch) => setAuthConfig((current) => ({ ...current, ...patch }))}
-        onLoginBodyTextChange={setLoginBodyText}
-      />
+      <div>
+        <div className="mb-2 flex items-center gap-1.5">
+          <span className="text-sm font-medium text-slate-300">Authentication</span>
+          <HelpTooltip
+            content="How the scanner logs in to test authenticated endpoints. Choose None if your API is public."
+            position="right"
+          />
+        </div>
+        <ProjectAuthConfigFields
+          authType={authType}
+          authConfig={authConfig}
+          loginBodyText={loginBodyText}
+          onAuthTypeChange={setAuthType}
+          onAuthConfigChange={(patch) => setAuthConfig((current) => ({ ...current, ...patch }))}
+          onLoginBodyTextChange={setLoginBodyText}
+        />
+      </div>
 
       <Button type="submit" disabled={saving}>
         {saving ? 'Saving...' : 'Save Settings'}

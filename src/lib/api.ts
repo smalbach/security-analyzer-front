@@ -1,3 +1,4 @@
+import type { DashboardStats } from '../types/dashboard';
 import type {
   AnalysisHistoryItem,
   AnalysisReport,
@@ -26,6 +27,14 @@ import type {
   UpdateProjectRequest,
   CreateProjectRoleRequest,
   UpdateProjectRoleRequest,
+  PerfTestPlan,
+  CreatePerfPlanRequest,
+  UpdatePerfPlanRequest,
+  PerfExecution,
+  PerfMetricWindow,
+  PerfRunSummary,
+  PerfComparisonReport,
+  CreatePerfComparisonRequest,
 } from '../types/api';
 import {
   forgotPassword as forgotPasswordRequest,
@@ -123,6 +132,10 @@ export class ApiClient {
 
   async getProfile() {
     return getProfileRequest(this.getRequestContext());
+  }
+
+  async getDashboardStats(): Promise<DashboardStats> {
+    return this.requestProtected<DashboardStats>('/dashboard/stats');
   }
 
   async updateVisibility(
@@ -575,6 +588,77 @@ export class ApiClient {
 
   async downloadReport(analysisId: string, format: ReportFormat): Promise<Blob> {
     return this.requestProtectedBlob(`/analysis/${analysisId}/report/${format}`);
+  }
+
+  // ─── Performance Testing ─────────────────────────────────────────────────
+
+  async getPerfPlans(projectId: string): Promise<Array<PerfTestPlan & { executionCount: number }>> {
+    return this.requestProtected(`/projects/${projectId}/perf-plans`);
+  }
+
+  async createPerfPlan(projectId: string, data: CreatePerfPlanRequest): Promise<PerfTestPlan> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/perf-plans`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getPerfPlan(projectId: string, planId: string): Promise<PerfTestPlan> {
+    return this.requestProtected(`/projects/${projectId}/perf-plans/${planId}`);
+  }
+
+  async updatePerfPlan(projectId: string, planId: string, data: UpdatePerfPlanRequest): Promise<PerfTestPlan> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/perf-plans/${planId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePerfPlan(projectId: string, planId: string): Promise<void> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/perf-plans/${planId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async startPerfExecution(projectId: string, planId: string, note?: string): Promise<{ executionId: string }> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/perf-plans/${planId}/executions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note }),
+    });
+  }
+
+  async getPerfExecutionsByPlan(projectId: string, planId: string): Promise<PerfExecution[]> {
+    return this.requestProtected(`/projects/${projectId}/perf-plans/${planId}/executions`);
+  }
+
+  async getPerfExecution(projectId: string, executionId: string): Promise<PerfExecution & { summary?: PerfRunSummary | null }> {
+    return this.requestProtected(`/projects/${projectId}/perf-executions/${executionId}`);
+  }
+
+  async getPerfExecutionStatus(projectId: string, executionId: string): Promise<{ status: string; progress: unknown; error: string | null }> {
+    return this.requestProtected(`/projects/${projectId}/perf-executions/${executionId}/status`);
+  }
+
+  async getPerfMetricWindows(
+    projectId: string,
+    executionId: string,
+    page = 1,
+    limit = 200,
+  ): Promise<{ data: PerfMetricWindow[]; total: number }> {
+    return this.requestProtected(
+      `/projects/${projectId}/perf-executions/${executionId}/metrics?page=${page}&limit=${limit}`,
+    );
+  }
+
+  async createPerfComparison(projectId: string, data: CreatePerfComparisonRequest): Promise<PerfComparisonReport> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/perf-executions/comparisons`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
   }
 
   private async request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {

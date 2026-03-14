@@ -1,6 +1,12 @@
+export * from './Accordion';
+export * from './Badge';
 export * from './Button';
+export * from './Card';
+export * from './DataTable';
 export * from './EmptyState';
 export * from './FormField';
+export * from './HelpTooltip';
+export * from './Icon';
 export * from './Input';
 export * from './LinkButton';
 export * from './MetricCard';
@@ -8,3 +14,4 @@ export * from './Modal';
 export * from './Select';
 export * from './TabBar';
 export * from './Textarea';
+export * from './Tooltip';
