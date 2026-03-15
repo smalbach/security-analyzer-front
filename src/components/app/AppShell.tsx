@@ -1,3 +1,4 @@
+import { Toaster } from 'sonner';
 import { NavHeader } from '../NavHeader';
 import { useAuth } from '../../contexts/AuthContext';
 import { HelpProvider } from '../../contexts/HelpContext';
@@ -32,6 +33,7 @@ export function AppShell() {
           </main>
 
           <HelpPanel />
+          <Toaster position="top-right" theme="dark" richColors closeButton />
         </div>
       </HelpProvider>
     </ActiveProjectProvider>

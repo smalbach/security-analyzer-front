@@ -44,6 +44,8 @@ export interface ApiEndpoint {
   requiresAuth: boolean;
   tags: string[];
   orderIndex: number;
+  preRequestScript: string | null;
+  postResponseScript: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +58,8 @@ export interface CreateEndpointRequest {
   requiresAuth?: boolean;
   tags?: string[];
   orderIndex?: number;
+  preRequestScript?: string;
+  postResponseScript?: string;
 }
 
 export interface TestEndpointRequest {

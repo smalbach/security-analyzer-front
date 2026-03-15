@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { isUnauthorizedError } from '../../lib/api';
+import { toast, toastPromise } from '../../lib/toast';
 import type { ApiEndpoint, Project } from '../../types/api';
 import type { CreatePerfPlanRequest, PerfTestPlan, UpdatePerfPlanRequest } from '../../types/performance';
+import { ConfirmModal } from '../ui';
 import { PerfPlanEditor } from './PerfPlanEditor';
 import { PerfPlanList } from './PerfPlanList';
 
@@ -21,7 +23,7 @@ export function PerformanceTab({ project }: PerformanceTabProps) {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>('list');
   const [editingPlan, setEditingPlan] = useState<PerfTestPlan | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<PerfTestPlan | null>(null);
 
   const fetchPlans = useCallback(async () => {
     try {
@@ -29,7 +31,7 @@ export function PerformanceTab({ project }: PerformanceTabProps) {
       setPlans(data);
     } catch (err) {
       if (isUnauthorizedError(err)) return;
-      setError('Failed to load performance plans.');
+      toast.error('Failed to load performance plans');
     } finally {
       setLoading(false);
     }
@@ -50,35 +52,53 @@ export function PerformanceTab({ project }: PerformanceTabProps) {
   }, [fetchPlans, fetchEndpoints]);
 
   async function handleCreate(data: CreatePerfPlanRequest) {
-    await api.createPerfPlan(project.id, data);
+    await toastPromise(api.createPerfPlan(project.id, data), {
+      loading: 'Creating plan...',
+      success: 'Plan created',
+    });
     setView('list');
     void fetchPlans();
   }
 
   async function handleUpdate(data: UpdatePerfPlanRequest) {
     if (!editingPlan) return;
-    await api.updatePerfPlan(project.id, editingPlan.id, data);
+    await toastPromise(api.updatePerfPlan(project.id, editingPlan.id, data), {
+      loading: 'Saving plan...',
+      success: 'Plan updated',
+    });
     setEditingPlan(null);
     setView('list');
     void fetchPlans();
   }
 
-  async function handleDelete(plan: PerfTestPlan) {
-    if (!window.confirm(`Delete plan "${plan.name}"? This will also delete all its executions.`)) return;
+  function handleDelete(plan: PerfTestPlan) {
+    setConfirmDelete(plan);
+  }
+
+  async function confirmDeletePlan() {
+    if (!confirmDelete) return;
+    const plan = confirmDelete;
+    setConfirmDelete(null);
     try {
-      await api.deletePerfPlan(project.id, plan.id);
+      await toastPromise(api.deletePerfPlan(project.id, plan.id), {
+        loading: 'Deleting plan...',
+        success: 'Plan deleted',
+      });
       void fetchPlans();
     } catch (err) {
-      setError('Failed to delete plan.');
+      if (isUnauthorizedError(err)) return;
     }
   }
 
   async function handleRun(plan: PerfTestPlan) {
     try {
-      const { executionId } = await api.startPerfExecution(project.id, plan.id);
+      const { executionId } = await toastPromise(api.startPerfExecution(project.id, plan.id), {
+        loading: 'Starting execution...',
+        success: 'Execution started',
+      });
       navigate(`/projects/${project.id}/perf-executions/${executionId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start execution.');
+      if (isUnauthorizedError(err)) return;
     }
   }
 
@@ -123,7 +143,6 @@ export function PerformanceTab({ project }: PerformanceTabProps) {
 
   return (
     <div className="space-y-4">
-      {error && <p className="text-xs text-red-400">{error}</p>}
       <PerfPlanList
         projectId={project.id}
         plans={plans}
@@ -132,6 +151,15 @@ export function PerformanceTab({ project }: PerformanceTabProps) {
         onDeleteClick={handleDelete}
         onRunClick={handleRun}
       />
+      {confirmDelete ? (
+        <ConfirmModal
+          title="Delete plan"
+          message={`Delete "${confirmDelete.name}"? This will also delete all its executions.`}
+          confirmLabel="Delete"
+          onConfirm={() => void confirmDeletePlan()}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      ) : null}
     </div>
   );
 }

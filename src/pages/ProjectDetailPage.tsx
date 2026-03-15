@@ -6,12 +6,13 @@ import {
   TestRunsTab,
 } from '../components/project-detail';
 import { PerformanceTab } from '../components/performance/PerformanceTab';
+import { FlowTestingTab } from '../components/flow-testing/FlowTestingTab';
 import { useProjectContext } from '../contexts/ProjectContext';
 
-type Tab = 'endpoints' | 'roles' | 'test-runs' | 'performance' | 'settings';
+type Tab = 'endpoints' | 'roles' | 'test-runs' | 'performance' | 'flow-testing' | 'settings';
 
 function getActiveTab(value: string | null): Tab {
-  if (value === 'roles' || value === 'test-runs' || value === 'performance' || value === 'settings') {
+  if (value === 'roles' || value === 'test-runs' || value === 'performance' || value === 'flow-testing' || value === 'settings') {
     return value;
   }
   return 'endpoints';
@@ -31,6 +32,7 @@ export function ProjectDetailPage() {
       {activeTab === 'roles' ? <RolesTab project={project} /> : null}
       {activeTab === 'test-runs' ? <TestRunsTab project={project} /> : null}
       {activeTab === 'performance' ? <PerformanceTab project={project} /> : null}
+      {activeTab === 'flow-testing' ? <FlowTestingTab project={project} /> : null}
       {activeTab === 'settings' ? (
         <SettingsTab project={project} onUpdated={setProject} />
       ) : null}

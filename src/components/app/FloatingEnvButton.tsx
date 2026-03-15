@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useActiveProject } from '../../contexts/ActiveProjectContext';
+import { toast } from '../../lib/toast';
 import { useSessionTokenStore } from '../../stores/sessionTokenStore';
 import { useEnvironmentStore } from '../../stores/environmentStore';
 import type { ProjectEnvironment } from '../../types/environments';
@@ -114,8 +115,9 @@ export function FloatingEnvButton() {
       setEnvironments((prev) =>
         prev.map((e) => ({ ...e, isActive: e.id === envId })),
       );
+      toast.success(`Environment "${env.name}" activated`);
     } catch {
-      // ignore
+      toast.error('Failed to activate environment');
     }
   };
 

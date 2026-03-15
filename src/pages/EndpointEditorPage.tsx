@@ -17,6 +17,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useActiveProject } from '../contexts/ActiveProjectContext';
 import { isUnauthorizedError } from '../lib/api';
+import { toast } from '../lib/toast';
 import { useSessionTokenStore } from '../stores/sessionTokenStore';
 import { useEnvironmentStore } from '../stores/environmentStore';
 import { generateCurl } from '../utils/generateCurl';
@@ -121,6 +122,9 @@ export function EndpointEditorPage() {
       if (currentEndpoint.parameters?.body?.example) {
         setBodyText(JSON.stringify(currentEndpoint.parameters.body.example, null, 2));
       }
+
+      setPreRequestScript(currentEndpoint.preRequestScript ?? '');
+      setPostResponseScript(currentEndpoint.postResponseScript ?? '');
     } catch {
       // Preserve the current UI state if fetching fails.
     } finally {
@@ -155,7 +159,7 @@ export function EndpointEditorPage() {
     setSaveError('');
 
     try {
-      const payload = buildEndpointPayload(endpoint, queryRows, headerRows, bodyText);
+      const payload = buildEndpointPayload(endpoint, queryRows, headerRows, bodyText, preRequestScript, postResponseScript);
 
       let savedId = endpointId;
       if (isNew) {
@@ -175,6 +179,8 @@ export function EndpointEditorPage() {
         );
         setRoleAccessDirty(false);
       }
+
+      toast.success(isNew ? 'Endpoint created' : 'Endpoint saved');
     } catch (saveRequestError) {
       if (isUnauthorizedError(saveRequestError)) {
         return;

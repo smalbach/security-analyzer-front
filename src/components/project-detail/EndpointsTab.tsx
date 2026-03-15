@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { isUnauthorizedError } from '../../lib/api';
+import { toastPromise } from '../../lib/toast';
 import {
   VERSION_PREFIX_REGEX,
   buildEndpointTree,
@@ -12,7 +13,7 @@ import {
 import type { EndpointTreeNode } from '../../lib/endpointTree';
 import { useEndpointSelectionStore } from '../../stores/endpointSelectionStore';
 import type { ApiEndpoint, PaginatedEndpointsResponse, Project } from '../../types/api';
-import { Button, EmptyState, Input, PageSizeSelector } from '../ui';
+import { Button, ConfirmModal, EmptyState, Input, PageSizeSelector } from '../ui';
 
 const DEFAULT_PAGE_SIZE = 100;
 
@@ -71,9 +72,9 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
   const [loading, setLoading] = useState(true);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState('');
   const [curlInput, setCurlInput] = useState('');
   const [curlImporting, setCurlImporting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [showImportPanel, setShowImportPanel] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
@@ -138,15 +139,16 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
   const handleImportFile = async () => {
     if (!importFile) return;
     setImporting(true);
-    setImportError('');
     try {
-      await api.importEndpointsFromFile(project.id, importFile);
+      await toastPromise(api.importEndpointsFromFile(project.id, importFile), {
+        loading: 'Importing endpoints...',
+        success: 'Endpoints imported successfully',
+      });
       setImportFile(null);
       setShowImportPanel(false);
       await fetchEndpoints(1, search);
     } catch (error) {
       if (isUnauthorizedError(error)) return;
-      setImportError(error instanceof Error ? error.message : 'Import failed');
     } finally {
       setImporting(false);
     }
@@ -155,23 +157,33 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
   const handleImportCurl = async () => {
     if (!curlInput.trim()) return;
     setCurlImporting(true);
-    setImportError('');
     try {
-      await api.importEndpointsFromCurl(project.id, curlInput.trim());
+      await toastPromise(api.importEndpointsFromCurl(project.id, curlInput.trim()), {
+        loading: 'Adding endpoint from cURL...',
+        success: 'Endpoint added',
+      });
       setCurlInput('');
       await fetchEndpoints(1, search);
     } catch (error) {
       if (isUnauthorizedError(error)) return;
-      setImportError(error instanceof Error ? error.message : 'cURL import failed');
     } finally {
       setCurlImporting(false);
     }
   };
 
-  const handleDelete = async (endpointId: string) => {
-    if (!confirm('Delete this endpoint?')) return;
+  const handleDelete = (endpointId: string) => {
+    setConfirmDelete(endpointId);
+  };
+
+  const confirmDeleteEndpoint = async () => {
+    if (!confirmDelete) return;
+    const id = confirmDelete;
+    setConfirmDelete(null);
     try {
-      await api.deleteEndpoint(project.id, endpointId);
+      await toastPromise(api.deleteEndpoint(project.id, id), {
+        loading: 'Deleting endpoint...',
+        success: 'Endpoint deleted',
+      });
       await fetchEndpoints(currentPage, search);
     } catch (error) {
       if (isUnauthorizedError(error)) return;
@@ -310,7 +322,6 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
 
       {showImportPanel ? (
         <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-          {importError ? <p className="text-xs text-red-400">{importError}</p> : null}
 
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -456,6 +467,15 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
           ) : null}
         </div>
       )}
+      {confirmDelete ? (
+        <ConfirmModal
+          title="Delete endpoint"
+          message="This endpoint will be permanently deleted. This action cannot be undone."
+          confirmLabel="Delete"
+          onConfirm={() => void confirmDeleteEndpoint()}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      ) : null}
     </div>
   );
 }

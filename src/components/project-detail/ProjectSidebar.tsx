@@ -3,6 +3,7 @@ import { useOptionalProjectContext } from '../../contexts/ProjectContext';
 import {
   ArrowLeftIcon,
   EndpointsIcon,
+  FlowTestingIcon,
   HelpIcon,
   PerformanceIcon,
   RolesIcon,
@@ -12,7 +13,7 @@ import {
 import { HelpTooltip } from '../ui/HelpTooltip';
 import { useHelp } from '../../contexts/HelpContext';
 
-type Tab = 'endpoints' | 'roles' | 'test-runs' | 'performance' | 'settings';
+type Tab = 'endpoints' | 'roles' | 'test-runs' | 'performance' | 'flow-testing' | 'settings';
 
 interface NavItem {
   id: Tab;
@@ -47,6 +48,12 @@ const NAV_ITEMS: NavItem[] = [
     tooltip: 'Simulate many users hitting your API at once to see how it performs under load.',
   },
   {
+    id: 'flow-testing',
+    label: 'Flow Testing',
+    icon: FlowTestingIcon,
+    tooltip: 'Build visual E2E API test flows. Chain requests, validate schemas, run assertions, and test with datasets.',
+  },
+  {
     id: 'settings',
     label: 'Settings',
     icon: SettingsIcon,
@@ -59,6 +66,7 @@ function getActiveTab(value: string | null): Tab {
     value === 'roles' ||
     value === 'test-runs' ||
     value === 'performance' ||
+    value === 'flow-testing' ||
     value === 'settings'
   ) {
     return value;

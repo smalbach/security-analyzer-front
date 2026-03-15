@@ -18,11 +18,21 @@ function fmtRps(rps: number): string {
 }
 
 export function PerfSummaryGrid({ summary }: PerfSummaryGridProps) {
-  const passedColor = summary.passed ? 'text-green-400' : 'text-red-400';
+  const noThresholds = summary.thresholdResults.length === 0;
+  // PASSED is vacuously true when no thresholds are configured — show it as neutral
+  const passedColor = noThresholds
+    ? 'text-slate-400'
+    : summary.passed
+      ? 'text-green-400'
+      : 'text-red-400';
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-      <MetricCard label="Status" value={summary.passed ? 'PASSED' : 'FAILED'} valueClassName={passedColor} />
+      <div className="metric-card">
+        <p className="metric-label">Status</p>
+        <p className={`metric-value ${passedColor}`}>{summary.passed ? 'PASSED' : 'FAILED'}</p>
+        {noThresholds && <p className="mt-0.5 text-xs text-slate-500">no thresholds set</p>}
+      </div>
       <MetricCard label="Total Requests" value={summary.totalRequests.toLocaleString()} />
       <MetricCard label="Error Rate" value={fmtPct(summary.errorRate)} valueClassName={summary.errorRate > 0.01 ? 'text-red-400' : undefined} />
       <MetricCard label="Avg RPS" value={fmtRps(summary.avgRps)} />

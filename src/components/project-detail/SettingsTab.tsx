@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ProjectAuthConfigFields, buildAuthConfigPayload, getAuthConfigLoginBodyText } from '../project-auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { isUnauthorizedError } from '../../lib/api';
+import { toast } from '../../lib/toast';
 import type { AuthConfig, Project } from '../../types/api';
 import { Button, FormField, HelpTooltip, Input, Textarea } from '../ui';
 
@@ -22,14 +23,12 @@ export function SettingsTab({ project, onUpdated }: SettingsTabProps) {
   const [authConfig, setAuthConfig] = useState<AuthConfig>(project.authConfig ?? { type: 'none' });
   const [loginBodyText, setLoginBodyText] = useState(() => getAuthConfigLoginBodyText(project.authConfig));
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     setError('');
-    setSaved(false);
 
     try {
       const authPayload = buildAuthConfigPayload(authType, authConfig, loginBodyText);
@@ -50,7 +49,7 @@ export function SettingsTab({ project, onUpdated }: SettingsTabProps) {
       });
 
       onUpdated(updatedProject);
-      setSaved(true);
+      toast.success('Settings saved');
     } catch (saveError) {
       if (isUnauthorizedError(saveError)) {
         return;
@@ -64,7 +63,6 @@ export function SettingsTab({ project, onUpdated }: SettingsTabProps) {
   return (
     <form onSubmit={(event) => void handleSave(event)} className="max-w-2xl space-y-4">
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
-      {saved ? <p className="text-sm text-emerald-400">Saved.</p> : null}
 
       <FormField label="Name *" htmlFor="project-name">
         <Input

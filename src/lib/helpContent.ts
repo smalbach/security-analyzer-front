@@ -210,4 +210,51 @@ export const HELP_SECTIONS: HelpSection[] = [
       },
     ],
   },
+  {
+    id: 'flow-testing',
+    title: 'Flow Testing',
+    icon: '🔀',
+    intro: 'Flow Testing lets you build visual E2E API test chains — like n8n or Postman Flows — with drag-and-drop nodes, assertions, scripts, and real-time execution.',
+    steps: [
+      {
+        step: 1,
+        title: 'Create a flow',
+        body: 'Go to the Flow Testing tab in your project and click "+ New Flow". Give it a descriptive name like "User Registration E2E" or "Checkout Flow". You\'ll be taken to the visual canvas editor.',
+        tip: 'Flows are saved per project, so you can have multiple flows testing different scenarios for the same API.',
+      },
+      {
+        step: 2,
+        title: 'Add nodes from the palette',
+        body: 'The left sidebar shows all available node types: Auth (login and extract tokens), Request (make HTTP calls), Condition (IF/ELSE branching), Loop (iterate over arrays), Merge (combine parallel branches), Delay (wait between calls), and Script (custom JavaScript logic). Drag them onto the canvas or click to add.',
+      },
+      {
+        step: 3,
+        title: 'Connect nodes',
+        body: 'Drag from a node\'s output handle (right side) to another node\'s input handle (left side) to create a connection. Data flows left-to-right through these connections. Condition nodes have two outputs: TRUE (right, green) and FALSE (bottom, red).',
+        tip: 'You can create parallel branches by connecting one node\'s output to multiple downstream nodes. Use a Merge node to rejoin them.',
+      },
+      {
+        step: 4,
+        title: 'Configure nodes',
+        body: 'Click any node to open its configuration panel on the right. Each node type has different settings. Request nodes let you pick from your existing endpoints, set headers, body, query params, and JSON Schema validation. Auth nodes handle login and token extraction.',
+      },
+      {
+        step: 5,
+        title: 'Use template variables',
+        body: 'Reference values from upstream nodes using {{nodeId.extractorName}} syntax. For environment variables use {{env.key}}. For example: {{auth.token}} gets the token from an auth node, and {{env.baseUrl}} gets the base URL from your selected environment.',
+        tip: 'You can select an environment from the toolbar dropdown before running the flow.',
+      },
+      {
+        step: 6,
+        title: 'Add assertions and scripts',
+        body: 'Request nodes have tabs for Scripts (pre/post-request JavaScript with flow.test() and flow.expect()), Assertions (visual builder for status, header, JSONPath, and timing checks), and Extractors (capture response values for downstream use). Scripts use a Postman-like API with the "flow" object.',
+      },
+      {
+        step: 7,
+        title: 'Run and monitor',
+        body: 'Click "Run Flow" in the toolbar (or Ctrl+Enter). The flow executes in topological order with parallel branches running simultaneously. Watch nodes light up in real time — green for success, red for error, yellow for warnings, orange for retrying. The timeline panel at the bottom shows detailed results.',
+        tip: 'Press Ctrl+S to save your flow at any time. Unsaved changes are indicated by an "Unsaved" badge.',
+      },
+    ],
+  },
 ];

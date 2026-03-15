@@ -53,6 +53,8 @@ export function buildEndpointPayload(
   queryRows: KVPair[],
   headerRows: KVPair[],
   bodyText: string,
+  preRequestScript: string,
+  postResponseScript: string,
 ): CreateEndpointRequest {
   return {
     method: endpoint.method ?? 'GET',
@@ -61,6 +63,8 @@ export function buildEndpointPayload(
     requiresAuth: endpoint.requiresAuth,
     tags: endpoint.tags,
     parameters: buildEndpointParameters(queryRows, headerRows, bodyText),
+    preRequestScript: preRequestScript || undefined,
+    postResponseScript: postResponseScript || undefined,
   };
 }
 

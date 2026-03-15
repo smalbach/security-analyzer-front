@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { toast, toastPromise } from '../../lib/toast';
 import { Modal } from '../ui/Modal';
-import { Button, Input } from '../ui';
+import { Button, ConfirmModal, Input } from '../ui';
 import type { ProjectEnvironment, EnvironmentVariable } from '../../types/environments';
 import { useEnvironmentStore } from '../../stores/environmentStore';
 
@@ -158,7 +159,7 @@ export function EnvironmentManager({ projectId, onClose }: EnvironmentManagerPro
   const [editName, setEditName] = useState('');
   const [editVars, setEditVars] = useState<EnvironmentVariable[]>([]);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
@@ -169,7 +170,7 @@ export function EnvironmentManager({ projectId, onClose }: EnvironmentManagerPro
       const envs = await api.getEnvironments(projectId);
       setEnvironments(envs);
     } catch {
-      setError('Failed to load environments');
+      toast.error('Failed to load environments');
     } finally {
       setLoading(false);
     }
@@ -182,7 +183,6 @@ export function EnvironmentManager({ projectId, onClose }: EnvironmentManagerPro
   const handleEdit = async (env: ProjectEnvironment) => {
     setEditingId(env.id);
     setEditName(env.name);
-    setError('');
     try {
       const revealed = await api.getEnvironment(projectId, env.id, true);
       setEditVars(revealed.variables);
@@ -194,16 +194,15 @@ export function EnvironmentManager({ projectId, onClose }: EnvironmentManagerPro
   const handleSave = async () => {
     if (!editingId) return;
     setSaving(true);
-    setError('');
     try {
-      await api.updateEnvironment(projectId, editingId, {
-        name: editName,
-        variables: editVars,
-      });
+      await toastPromise(
+        api.updateEnvironment(projectId, editingId, { name: editName, variables: editVars }),
+        { loading: 'Saving environment...', success: 'Environment saved' },
+      );
       setEditingId(null);
       void fetchAll();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save');
+    } catch {
+      // toastPromise shows the error
     } finally {
       setSaving(false);
     }
@@ -212,40 +211,55 @@ export function EnvironmentManager({ projectId, onClose }: EnvironmentManagerPro
   const handleCreate = async () => {
     if (!newName.trim()) return;
     setSaving(true);
-    setError('');
     try {
-      await api.createEnvironment(projectId, {
-        name: newName.trim(),
-        variables: [],
-        isActive: environments.length === 0,
-      });
+      await toastPromise(
+        api.createEnvironment(projectId, {
+          name: newName.trim(),
+          variables: [],
+          isActive: environments.length === 0,
+        }),
+        { loading: 'Creating environment...', success: 'Environment created' },
+      );
       setNewName('');
       setCreating(false);
       void fetchAll();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create');
+    } catch {
+      // toastPromise shows the error
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (envId: string) => {
+  const handleDelete = (envId: string) => {
+    setConfirmDelete(envId);
+  };
+
+  const confirmDeleteEnv = async () => {
+    if (!confirmDelete) return;
+    const envId = confirmDelete;
+    setConfirmDelete(null);
     try {
-      await api.deleteEnvironment(projectId, envId);
+      await toastPromise(api.deleteEnvironment(projectId, envId), {
+        loading: 'Deleting environment...',
+        success: 'Environment deleted',
+      });
       if (editingId === envId) setEditingId(null);
       void fetchAll();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to delete');
+    } catch {
+      // toastPromise shows the error
     }
   };
 
   const handleActivate = async (envId: string) => {
     try {
-      const env = await api.activateEnvironment(projectId, envId);
+      const env = await toastPromise(api.activateEnvironment(projectId, envId), {
+        loading: 'Activating...',
+        success: 'Environment activated',
+      });
       setActiveEnvInStore(projectId, env);
       void fetchAll();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to activate');
+    } catch {
+      // toastPromise shows the error
     }
   };
 
@@ -260,14 +274,13 @@ export function EnvironmentManager({ projectId, onClose }: EnvironmentManagerPro
   };
 
   return (
+    <>
     <Modal
       title="Environment Manager"
       description="Each variable has a Default Value (initial/shared) and a Current Value (runtime, updated by scripts)."
       size="xl"
       onClose={onClose}
     >
-      {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
-
       {loading ? (
         <p className="py-8 text-center text-sm text-slate-500">Loading environments...</p>
       ) : editingId ? (
@@ -384,5 +397,16 @@ export function EnvironmentManager({ projectId, onClose }: EnvironmentManagerPro
         </div>
       )}
     </Modal>
+
+    {confirmDelete ? (
+      <ConfirmModal
+        title="Delete environment"
+        message="This environment and all its variables will be permanently deleted."
+        confirmLabel="Delete"
+        onConfirm={() => void confirmDeleteEnv()}
+        onCancel={() => setConfirmDelete(null)}
+      />
+    ) : null}
+    </>
   );
 }

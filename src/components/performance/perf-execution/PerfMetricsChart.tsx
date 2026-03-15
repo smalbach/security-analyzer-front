@@ -9,13 +9,16 @@ interface PerfMetricsChartProps {
  * Keeps zero dependencies while being readable in the browser.
  */
 export function PerfMetricsChart({ windows }: PerfMetricsChartProps) {
-  if (windows.length < 2) {
+  if (windows.length === 0) {
     return (
       <div className="flex h-32 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xs text-slate-500">
         Waiting for data…
       </div>
     );
   }
+
+  // Duplicate a single window so the SVG line math never divides by zero
+  const effectiveWindows = windows.length === 1 ? [windows[0], windows[0]] : windows;
 
   const WIDTH = 600;
   const HEIGHT = 120;
@@ -24,19 +27,19 @@ export function PerfMetricsChart({ windows }: PerfMetricsChartProps) {
   const chartH = HEIGHT - PADDING.top - PADDING.bottom;
 
   // P95 line
-  const p95Values = windows.map((w) => w.p95);
+  const p95Values = effectiveWindows.map((w) => w.p95);
   const maxP95 = Math.max(...p95Values, 1);
   const p95Points = p95Values.map((v, i) => ({
-    x: PADDING.left + (i / (windows.length - 1)) * chartW,
+    x: PADDING.left + (i / (effectiveWindows.length - 1)) * chartW,
     y: PADDING.top + chartH - (v / maxP95) * chartH,
   }));
   const p95Path = p95Points.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`).join(' ');
 
   // RPS line (secondary axis, normalise 0–1 against max)
-  const rpsValues = windows.map((w) => w.rps);
+  const rpsValues = effectiveWindows.map((w) => w.rps);
   const maxRps = Math.max(...rpsValues, 1);
   const rpsPoints = rpsValues.map((v, i) => ({
-    x: PADDING.left + (i / (windows.length - 1)) * chartW,
+    x: PADDING.left + (i / (effectiveWindows.length - 1)) * chartW,
     y: PADDING.top + chartH - (v / maxRps) * chartH,
   }));
   const rpsPath = rpsPoints.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`).join(' ');

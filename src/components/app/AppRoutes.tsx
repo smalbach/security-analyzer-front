@@ -15,6 +15,8 @@ import { ReportPage } from '../../pages/ReportPage';
 import { ResetPasswordPage } from '../../pages/ResetPasswordPage';
 import { TestRunPage } from '../../pages/TestRunPage';
 import { PerfExecutionPage } from '../../pages/PerfExecutionPage';
+import { PerfPlanExecutionsPage } from '../../pages/PerfPlanExecutionsPage';
+import { FlowBuilderPage } from '../../pages/FlowBuilderPage';
 
 export function AppRoutes() {
   return (
@@ -51,7 +53,9 @@ export function AppRoutes() {
         <Route index element={<ProjectDetailPage />} />
         <Route path="endpoints/:endpointId" element={<EndpointEditorPage />} />
         <Route path="test-runs/:runId" element={<TestRunPage />} />
+        <Route path="perf-executions" element={<PerfPlanExecutionsPage />} />
         <Route path="perf-executions/:execId" element={<PerfExecutionPage />} />
+        <Route path="flows/:flowId" element={<FlowBuilderPage />} />
       </Route>
       <Route
         path="/analysis/new"

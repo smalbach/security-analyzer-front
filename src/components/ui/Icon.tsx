@@ -79,3 +79,13 @@ export const ArrowLeftIcon = icon(
     <path d="M9 5l-5 5 5 5" />
   </>,
 );
+
+export const FlowTestingIcon = icon(
+  <>
+    <circle cx="4" cy="10" r="2" />
+    <circle cx="10" cy="4" r="2" />
+    <circle cx="10" cy="16" r="2" />
+    <circle cx="16" cy="10" r="2" />
+    <path d="M6 10h2M10 6v2M10 14v-2M12 10h2" />
+  </>,
+);

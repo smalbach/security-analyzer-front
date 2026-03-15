@@ -3,9 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePerfExecutionStream } from '../hooks/usePerfExecutionStream';
 import type { PerfExecution, PerfMetricWindow, PerfRunSummary } from '../types/performance';
+import { EndpointBreakdownTable } from '../components/performance/perf-execution/EndpointBreakdownTable';
 import { PerfExecutionProgress } from '../components/performance/perf-execution/PerfExecutionProgress';
 import { PerfMetricsChart } from '../components/performance/perf-execution/PerfMetricsChart';
 import { PerfSummaryGrid } from '../components/performance/perf-execution/PerfSummaryGrid';
+import { ScenarioStepsPanel } from '../components/performance/perf-execution/ScenarioStepsPanel';
 import { ThresholdResultsTable } from '../components/performance/perf-execution/ThresholdResultsTable';
 import { Button } from '../components/ui';
 
@@ -46,6 +48,28 @@ export function PerfExecutionPage() {
   useEffect(() => {
     void loadExecution();
   }, [loadExecution]);
+
+  // Polling fallback: the worker fires via setImmediate almost immediately after
+  // the HTTP response, so WebSocket events can be emitted before the browser socket
+  // connects. If those events are missed, the page never leaves "pending" state.
+  // Poll every 5 s while live so we converge to the final state even when WS is lost.
+  useEffect(() => {
+    if (!isLive || !projectId || !execId) return;
+    const interval = setInterval(async () => {
+      try {
+        const statusData = await api.getPerfExecutionStatus(projectId, execId);
+        // Keep execution state fresh so the progress bar updates during live runs
+        setExecution((prev) => prev ? { ...prev, status: statusData.status as PerfExecution['status'], progress: statusData.progress as PerfExecution['progress'] } : prev);
+        if (statusData.status === 'completed' || statusData.status === 'failed') {
+          setIsLive(false);
+          void loadExecution();
+        }
+      } catch {
+        // ignore transient poll errors
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isLive, projectId, execId, api, loadExecution]);
 
   const { progressPercent, isStreaming, metricWindows } = usePerfExecutionStream({
     baseUrl: (api as any).baseUrl ?? '',
@@ -151,6 +175,22 @@ export function PerfExecutionPage() {
         <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
           <h2 className="text-sm font-semibold text-slate-300">Threshold Results</h2>
           <ThresholdResultsTable results={summary.thresholdResults} />
+        </div>
+      )}
+
+      {/* Endpoint breakdown */}
+      {historicWindows.length > 0 && (
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-slate-300">Endpoint Breakdown</h2>
+          <EndpointBreakdownTable windows={historicWindows} />
+        </div>
+      )}
+
+      {/* Scenarios executed */}
+      {execution.options && execution.options.scenarios.length > 0 && (
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-slate-300">Scenarios Executed</h2>
+          <ScenarioStepsPanel options={execution.options} />
         </div>
       )}
 

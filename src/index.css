@@ -2888,6 +2888,12 @@
     width: 100%;
   }
 
+  /* When shell contains flow builder, use fixed height so h-full chain works */
+  .project-layout-shell:has(.flow-builder-root) {
+    height: calc(100vh - var(--nav-height));
+    align-items: stretch;
+  }
+
   .project-sidebar {
     width: 260px;
     flex-shrink: 0;
@@ -3021,6 +3027,13 @@
     flex: 1;
     min-width: 0;
     padding: 2rem;
+    overflow: hidden;
+  }
+
+  /* Flow builder needs full-bleed canvas with explicit height for ReactFlow */
+  .project-content-area:has(.flow-builder-root) {
+    padding: 0;
+    height: calc(100vh - var(--nav-height));
     overflow: hidden;
   }
 
@@ -3662,5 +3675,24 @@
     background: rgb(var(--accent-400));
     border-color: rgb(var(--accent-400));
     color: #fff;
+  }
+}
+
+/* ─── Flow Testing Animations ──────────────────────────────────────────────── */
+
+@keyframes flowEdgeDash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
   }
 }

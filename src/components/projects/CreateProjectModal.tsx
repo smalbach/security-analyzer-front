@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ProjectAuthConfigFields, buildAuthConfigPayload, getAuthConfigLoginBodyText } from '../project-auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { isUnauthorizedError } from '../../lib/api';
+import { toast } from '../../lib/toast';
 import type { AuthConfig, CreateProjectRequest, Project } from '../../types/api';
 import { Button, FormField, Input, Modal, Textarea } from '../ui';
 
@@ -43,6 +44,7 @@ export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalPro
       };
 
       const project = await api.createProject(payload);
+      toast.success('Project created');
       onCreated(project);
     } catch (submitError) {
       if (isUnauthorizedError(submitError)) {

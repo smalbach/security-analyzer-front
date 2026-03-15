@@ -39,6 +39,18 @@ import type {
   CreateEnvironmentRequest,
   UpdateEnvironmentRequest,
 } from '../types/api';
+import type {
+  FlowDefinition,
+  FlowExecution,
+  FlowDataset,
+  FlowExecutionBatch,
+  CreateFlowRequest,
+  UpdateFlowRequest,
+  SaveCanvasRequest,
+  ExecuteFlowRequest,
+  ExecuteFlowBatchRequest,
+  CreateDatasetRequest,
+} from '../types/flow';
 import {
   forgotPassword as forgotPasswordRequest,
   getProfile as getProfileRequest,
@@ -802,6 +814,104 @@ export class ApiClient {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+    });
+  }
+
+  // ─── Flow Testing ──────────────────────────────────────────────────────
+
+  async getFlows(projectId: string): Promise<FlowDefinition[]> {
+    return this.requestProtected(`/projects/${projectId}/flows`);
+  }
+
+  async createFlow(projectId: string, data: CreateFlowRequest): Promise<FlowDefinition> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flows`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getFlow(projectId: string, flowId: string): Promise<FlowDefinition> {
+    return this.requestProtected(`/projects/${projectId}/flows/${flowId}`);
+  }
+
+  async updateFlow(projectId: string, flowId: string, data: UpdateFlowRequest): Promise<FlowDefinition> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flows/${flowId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async saveFlowCanvas(projectId: string, flowId: string, data: SaveCanvasRequest): Promise<FlowDefinition> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flows/${flowId}/canvas`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async duplicateFlow(projectId: string, flowId: string): Promise<FlowDefinition> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flows/${flowId}/duplicate`, {
+      method: 'POST',
+    });
+  }
+
+  async deleteFlow(projectId: string, flowId: string): Promise<void> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flows/${flowId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async startFlowExecution(projectId: string, flowId: string, data?: ExecuteFlowRequest): Promise<FlowExecution> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flows/${flowId}/executions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data || {}),
+    });
+  }
+
+  async startFlowBatchExecution(projectId: string, flowId: string, data: ExecuteFlowBatchRequest): Promise<FlowExecutionBatch> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flows/${flowId}/executions/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getFlowExecutions(projectId: string, flowId: string): Promise<FlowExecution[]> {
+    return this.requestProtected(`/projects/${projectId}/flows/${flowId}/executions`);
+  }
+
+  async getFlowExecution(projectId: string, flowId: string, executionId: string): Promise<FlowExecution> {
+    return this.requestProtected(`/projects/${projectId}/flows/${flowId}/executions/${executionId}`);
+  }
+
+  async cancelFlowExecution(projectId: string, flowId: string, executionId: string): Promise<void> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flows/${flowId}/executions/${executionId}/cancel`, {
+      method: 'POST',
+    });
+  }
+
+  async getFlowBatch(projectId: string, flowId: string, batchId: string): Promise<FlowExecutionBatch> {
+    return this.requestProtected(`/projects/${projectId}/flows/${flowId}/executions/batches/${batchId}`);
+  }
+
+  async getFlowDatasets(projectId: string, flowId: string): Promise<FlowDataset[]> {
+    return this.requestProtected(`/projects/${projectId}/flows/${flowId}/datasets`);
+  }
+
+  async createFlowDataset(projectId: string, flowId: string, data: CreateDatasetRequest): Promise<FlowDataset> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flows/${flowId}/datasets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteFlowDataset(projectId: string, flowId: string, datasetId: string): Promise<void> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flows/${flowId}/datasets/${datasetId}`, {
+      method: 'DELETE',
     });
   }
 

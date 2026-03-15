@@ -17,6 +17,7 @@ import {
 import { Button, EmptyState, LinkButton, PageSizeSelector } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { isUnauthorizedError } from '../lib/api';
+import { toast } from '../lib/toast';
 import { TEST_RUN_STATUS_BADGE } from '../lib/testRuns';
 import type { EndpointTestResult, PaginatedTestRunResults, ReportFormat, TestRun } from '../types/api';
 
@@ -103,6 +104,7 @@ export function TestRunPage() {
 
   const handleDownload = async (format: ReportFormat) => {
     if (!projectId || !runId) return;
+    const toastId = toast.loading(`Generating ${format.toUpperCase()} report...`);
     try {
       const blob = await api.downloadTestRunReport(projectId, runId, format);
       const url = URL.createObjectURL(blob);
@@ -111,9 +113,13 @@ export function TestRunPage() {
       anchor.download = `report-${runId}.${format}`;
       anchor.click();
       URL.revokeObjectURL(url);
+      toast.success('Report downloaded', { id: toastId });
     } catch (downloadError) {
       if (isUnauthorizedError(downloadError)) return;
-      alert(downloadError instanceof Error ? downloadError.message : 'Download failed');
+      toast.error(
+        downloadError instanceof Error ? downloadError.message : 'Download failed',
+        { id: toastId },
+      );
     }
   };
 
