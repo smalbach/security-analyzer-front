@@ -40,6 +40,7 @@ interface FlowBuilderState {
   showExecutionReport: boolean;
   fullExecutionData: FlowExecution | null;
   stepDelayMs: number;
+  globalVariables: Record<string, unknown> | null;
 
   // Actions - Canvas
   setNodes: (nodes: FlowCanvasNode[]) => void;
@@ -83,6 +84,7 @@ interface FlowBuilderState {
     nodes: FlowCanvasNode[],
     edges: FlowCanvasEdge[],
     viewport?: Viewport,
+    globalVariables?: Record<string, unknown> | null,
   ) => void;
   resetStore: () => void;
 
@@ -145,6 +147,7 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
   showExecutionReport: false,
   fullExecutionData: null,
   stepDelayMs: 0,
+  globalVariables: null,
 
   // Canvas actions
   setNodes: (nodes) => set({ nodes, isDirty: true }),
@@ -308,7 +311,7 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
   },
 
   // Load flow
-  loadFlow: (flowId, name, nodes, edges, viewport) => {
+  loadFlow: (flowId, name, nodes, edges, viewport, globalVariables) => {
     set({
       flowId,
       flowName: name,
@@ -324,6 +327,7 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
       nodeRetries: {},
       isExecuting: false,
       executionSummary: null,
+      globalVariables: globalVariables ?? null,
     });
   },
 
@@ -348,6 +352,7 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
       showExecutionReport: false,
       fullExecutionData: null,
       stepDelayMs: 0,
+      globalVariables: null,
     });
   },
 

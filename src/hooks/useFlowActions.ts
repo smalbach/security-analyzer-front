@@ -56,6 +56,7 @@ export function useFlowActions({ projectId, flowId }: UseFlowActionsArgs) {
       const { stepDelayMs } = useFlowBuilderStore.getState();
       const execution = await api.startFlowExecution(projectId, flowId, {
         ...(stepDelayMs > 0 && { stepDelayMs }),
+        sequential: true,
       });
       setExecutionId(execution.id);
       setIsExecuting(true);

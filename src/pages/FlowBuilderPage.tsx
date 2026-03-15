@@ -92,7 +92,7 @@ function FlowBuilderContent() {
         const flow = await api.getFlow(projectId, flowId);
         const canvasNodes = (flow.nodes || []).map(flowNodeToCanvasNode);
         const canvasEdges = (flow.edges || []).map(flowEdgeToCanvasEdge);
-        loadFlow(flowId, flow.name, canvasNodes, canvasEdges, flow.viewport || undefined);
+        loadFlow(flowId, flow.name, canvasNodes, canvasEdges, flow.viewport || undefined, flow.globalVariables);
         if (flow.environmentId) setSelectedEnvironmentId(flow.environmentId);
       } catch (err) {
         if (!isUnauthorizedError(err)) toast.error('Failed to load flow');

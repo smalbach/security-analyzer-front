@@ -315,6 +315,7 @@ export interface ExecuteFlowRequest {
   environmentId?: string;
   environmentOverrides?: Record<string, unknown>;
   stepDelayMs?: number;
+  sequential?: boolean;
 }
 
 export interface ExecuteFlowBatchRequest {

@@ -1,5 +1,8 @@
-import { ConfigField, ConfigInput, ConfigTextarea, ConfigSelect } from './ConfigField';
+import { ConfigField, ConfigSelect } from './ConfigField';
 import { EndpointPicker } from './EndpointPicker';
+import { JsonEditor } from './JsonEditor';
+import { TemplateInput } from './TemplateInput';
+import { useTemplateCompletions } from '../../../hooks/useTemplateCompletions';
 import type { ApiEndpoint } from '../../../types/api';
 
 interface RequestNodeConfigProps {
@@ -10,6 +13,7 @@ interface RequestNodeConfigProps {
 
 export function RequestNodeConfig({ config, onChange, projectId }: RequestNodeConfigProps) {
   const update = (field: string, value: unknown) => onChange({ ...config, [field]: value });
+  const completions = useTemplateCompletions(projectId);
 
   const handleEndpointSelect = (ep: ApiEndpoint) => {
     const headers: Record<string, string> = {};
@@ -53,8 +57,13 @@ export function RequestNodeConfig({ config, onChange, projectId }: RequestNodeCo
         />
       </ConfigField>
 
-      <ConfigField label="URL" help="Request URL. Use {{env.baseUrl}} for the environment base URL, {{nodeId.extractorName}} for upstream values.">
-        <ConfigInput value={String(config.url || '')} onChange={(v) => update('url', v)} placeholder="{{env.baseUrl}}/api/users" mono />
+      <ConfigField label="URL" help="Request URL. Use {{env.baseUrl}} for the environment base URL, {{nodeId.extractorName}} for upstream values. Type {{ to see available variables.">
+        <TemplateInput
+          value={String(config.url || '')}
+          onChange={(v) => update('url', v)}
+          completions={completions}
+          placeholder="{{env.baseUrl}}/api/users"
+        />
       </ConfigField>
 
       <ConfigField label="Method">
@@ -62,37 +71,42 @@ export function RequestNodeConfig({ config, onChange, projectId }: RequestNodeCo
           options={['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map((m) => ({ value: m, label: m }))} />
       </ConfigField>
 
-      <ConfigField label="Headers (JSON)" help="HTTP headers. JSON key-value pairs.">
-        <ConfigTextarea
+      <ConfigField label="Headers (JSON)" help="HTTP headers. JSON key-value pairs. Type {{ inside a value to see available variables.">
+        <JsonEditor
           value={typeof config.headers === 'string' ? config.headers : JSON.stringify(config.headers || {}, null, 2)}
-          onChange={(v) => { try { update('headers', JSON.parse(v)); } catch { /* keep raw */ } }}
+          onChange={(raw) => { try { update('headers', JSON.parse(raw)); } catch { update('headers', raw); } }}
           placeholder='{"Content-Type": "application/json"}'
+          minHeight="80px"
+          templateCompletions={completions}
         />
       </ConfigField>
 
-      <ConfigField label="Query Params (JSON)" help="URL query parameters as key-value pairs.">
-        <ConfigTextarea
+      <ConfigField label="Query Params (JSON)" help="URL query parameters as key-value pairs. Type {{ inside a value to see available variables.">
+        <JsonEditor
           value={typeof config.queryParams === 'string' ? config.queryParams : JSON.stringify(config.queryParams || {}, null, 2)}
-          onChange={(v) => { try { update('queryParams', JSON.parse(v)); } catch { /* keep raw */ } }}
+          onChange={(raw) => { try { update('queryParams', JSON.parse(raw)); } catch { update('queryParams', raw); } }}
           placeholder='{"page": "1", "limit": "10"}'
-          rows={2}
+          minHeight="60px"
+          templateCompletions={completions}
         />
       </ConfigField>
 
-      <ConfigField label="Body (JSON)" help="Request body. Supports template variables like {{env.key}} and {{nodeId.extractor}}.">
-        <ConfigTextarea
+      <ConfigField label="Body (JSON)" help="Request body. Type {{ inside a value to see available template variables.">
+        <JsonEditor
           value={typeof config.body === 'string' ? config.body : JSON.stringify(config.body || null, null, 2)}
-          onChange={(v) => { try { update('body', JSON.parse(v)); } catch { /* keep raw */ } }}
+          onChange={(raw) => { try { update('body', JSON.parse(raw)); } catch { update('body', raw); } }}
           placeholder='{"name": "Test"}'
+          minHeight="100px"
+          templateCompletions={completions}
         />
       </ConfigField>
 
       <ConfigField label="Response Schema (JSON Schema)" help="Paste a JSON Schema to validate the response structure. Errors = missing/wrong types, Warnings = extra fields (contract drift).">
-        <ConfigTextarea
+        <JsonEditor
           value={typeof config.responseSchema === 'string' ? config.responseSchema : JSON.stringify(config.responseSchema || null, null, 2)}
-          onChange={(v) => { try { update('responseSchema', JSON.parse(v)); } catch { /* keep raw */ } }}
+          onChange={(raw) => { try { update('responseSchema', JSON.parse(raw)); } catch { update('responseSchema', raw); } }}
           placeholder="Paste JSON Schema to validate response"
-          rows={5}
+          minHeight="120px"
         />
       </ConfigField>
 
