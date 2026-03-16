@@ -50,6 +50,12 @@ import type {
   ExecuteFlowRequest,
   ExecuteFlowBatchRequest,
   CreateDatasetRequest,
+  FlowGroup,
+  FlowGroupItem,
+  FlowGroupExecution,
+  CreateFlowGroupRequest,
+  UpdateFlowGroupRequest,
+  ReorderGroupItemsRequest,
 } from '../types/flow';
 import {
   forgotPassword as forgotPasswordRequest,
@@ -912,6 +918,84 @@ export class ApiClient {
   async deleteFlowDataset(projectId: string, flowId: string, datasetId: string): Promise<void> {
     return this.requestProtectedWithAuth(`/projects/${projectId}/flows/${flowId}/datasets/${datasetId}`, {
       method: 'DELETE',
+    });
+  }
+
+  // ─── Flow Groups ──────────────────────────────────────────────────────
+
+  async getFlowGroups(projectId: string): Promise<FlowGroup[]> {
+    return this.requestProtected(`/projects/${projectId}/flow-groups`);
+  }
+
+  async getGroupedFlowIds(projectId: string): Promise<string[]> {
+    return this.requestProtected(`/projects/${projectId}/flow-groups/grouped-flow-ids`);
+  }
+
+  async createFlowGroup(projectId: string, data: CreateFlowGroupRequest): Promise<FlowGroup> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flow-groups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getFlowGroup(projectId: string, groupId: string): Promise<FlowGroup> {
+    return this.requestProtected(`/projects/${projectId}/flow-groups/${groupId}`);
+  }
+
+  async updateFlowGroup(projectId: string, groupId: string, data: UpdateFlowGroupRequest): Promise<FlowGroup> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flow-groups/${groupId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteFlowGroup(projectId: string, groupId: string): Promise<void> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flow-groups/${groupId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async addFlowToGroup(projectId: string, groupId: string, flowId: string): Promise<FlowGroupItem> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flow-groups/${groupId}/flows`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flowId }),
+    });
+  }
+
+  async removeFlowFromGroup(projectId: string, groupId: string, flowId: string): Promise<void> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flow-groups/${groupId}/flows/${flowId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async reorderGroupItems(projectId: string, groupId: string, data: ReorderGroupItemsRequest): Promise<void> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flow-groups/${groupId}/flows/reorder`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async startGroupExecution(projectId: string, groupId: string): Promise<FlowGroupExecution> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flow-groups/${groupId}/execute`, {
+      method: 'POST',
+    });
+  }
+
+  async getGroupExecutions(projectId: string, groupId: string): Promise<FlowGroupExecution[]> {
+    return this.requestProtected(`/projects/${projectId}/flow-groups/${groupId}/executions`);
+  }
+
+  async getGroupExecution(projectId: string, groupId: string, execId: string): Promise<FlowGroupExecution> {
+    return this.requestProtected(`/projects/${projectId}/flow-groups/${groupId}/executions/${execId}`);
+  }
+
+  async cancelGroupExecution(projectId: string, groupId: string, execId: string): Promise<void> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/flow-groups/${groupId}/executions/${execId}/cancel`, {
+      method: 'POST',
     });
   }
 

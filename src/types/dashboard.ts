@@ -15,6 +15,29 @@ export interface DashboardStats {
     mediumCount: number;
     lowCount: number;
   };
+  flowTesting: {
+    totalFlows: number;
+    totalGroups: number;
+    totalExecutions: number;
+    passRate: number;
+    recentGroupExecutions: {
+      id: string;
+      groupName: string;
+      projectName: string;
+      status: string;
+      totalFlows: number;
+      passedFlows: number;
+      failedFlows: number;
+      durationMs: number;
+      completedAt: string | null;
+    }[];
+  };
+  performance: {
+    totalExecutions: number;
+    averageResponseTime: number;
+    p95ResponseTime: number;
+    passRate: number;
+  };
   recentTestRuns: {
     id: string;
     projectName: string;

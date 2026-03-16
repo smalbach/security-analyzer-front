@@ -12,6 +12,9 @@ export interface Project {
   lastRunSummary?: {
     securityScore?: number;
     globalRiskLevel?: string;
+    flowTestHealth?: 'passed' | 'failed' | 'warning' | 'none';
+    flowTestPassRate?: number;
+    perfTestHealth?: 'good' | 'degraded' | 'critical' | 'none';
   };
   createdAt: string;
   updatedAt: string;

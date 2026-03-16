@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import type { Project } from '../../types/api';
 import { Button } from '../ui';
+import { cn } from '../../lib/cn';
 
 interface ProjectCardProps {
   project: Project;
@@ -16,9 +17,50 @@ function getHealthClasses(score?: number): string {
   return 'border-red-500/20 bg-red-500/[0.08]';
 }
 
+function getHealthDotColor(health?: string): string {
+  switch (health) {
+    case 'passed':
+    case 'good':
+      return 'bg-emerald-400';
+    case 'warning':
+    case 'degraded':
+      return 'bg-yellow-400';
+    case 'failed':
+    case 'critical':
+      return 'bg-rose-400';
+    default:
+      return 'bg-slate-600';
+  }
+}
+
+function getHealthLabel(health?: string): string {
+  switch (health) {
+    case 'passed':
+      return 'Pass';
+    case 'good':
+      return 'Good';
+    case 'warning':
+      return 'Warn';
+    case 'degraded':
+      return 'Slow';
+    case 'failed':
+      return 'Fail';
+    case 'critical':
+      return 'Crit';
+    default:
+      return '—';
+  }
+}
+
 export function ProjectCard({ project, onArchive, onUnarchive }: ProjectCardProps) {
   const navigate = useNavigate();
   const healthClasses = getHealthClasses(project.lastRunSummary?.securityScore);
+
+  const summary = project.lastRunSummary;
+  const hasAnyHealth =
+    summary?.securityScore !== undefined ||
+    (summary?.flowTestHealth && summary.flowTestHealth !== 'none') ||
+    (summary?.perfTestHealth && summary.perfTestHealth !== 'none');
 
   return (
     <div
@@ -71,6 +113,58 @@ export function ProjectCard({ project, onArchive, onUnarchive }: ProjectCardProp
           </Button>
         )}
       </div>
+
+      {/* Test health indicators */}
+      {hasAnyHealth && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {/* Security */}
+          {summary?.securityScore !== undefined && (
+            <div className="flex items-center gap-1.5" title={`Security Score: ${summary.securityScore}%`}>
+              <span
+                className={cn(
+                  'h-2 w-2 rounded-full',
+                  summary.securityScore >= 80
+                    ? 'bg-emerald-400'
+                    : summary.securityScore >= 60
+                      ? 'bg-yellow-400'
+                      : summary.securityScore >= 40
+                        ? 'bg-orange-400'
+                        : 'bg-rose-400',
+                )}
+              />
+              <span className="text-[10px] text-slate-500">
+                Security {summary.securityScore}%
+              </span>
+            </div>
+          )}
+
+          {/* Flow Tests */}
+          {summary?.flowTestHealth && summary.flowTestHealth !== 'none' && (
+            <div
+              className="flex items-center gap-1.5"
+              title={`Flow Tests: ${getHealthLabel(summary.flowTestHealth)}${summary.flowTestPassRate ? ` (${summary.flowTestPassRate}% pass rate)` : ''}`}
+            >
+              <span className={cn('h-2 w-2 rounded-full', getHealthDotColor(summary.flowTestHealth))} />
+              <span className="text-[10px] text-slate-500">
+                Flows {summary.flowTestPassRate ? `${summary.flowTestPassRate}%` : getHealthLabel(summary.flowTestHealth)}
+              </span>
+            </div>
+          )}
+
+          {/* Performance */}
+          {summary?.perfTestHealth && summary.perfTestHealth !== 'none' && (
+            <div
+              className="flex items-center gap-1.5"
+              title={`Performance: ${getHealthLabel(summary.perfTestHealth)}`}
+            >
+              <span className={cn('h-2 w-2 rounded-full', getHealthDotColor(summary.perfTestHealth))} />
+              <span className="text-[10px] text-slate-500">
+                Perf {getHealthLabel(summary.perfTestHealth)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {(project.tags ?? []).length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-1.5">

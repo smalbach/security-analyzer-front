@@ -6,3 +6,4 @@ export { VulnerabilitiesChart } from './VulnerabilitiesChart';
 export { RecentTestRuns } from './RecentTestRuns';
 export { ProjectsOverview } from './ProjectsOverview';
 export { TestRunsByStatus } from './TestRunsByStatus';
+export { FlowTestingOverview } from './FlowTestingOverview';

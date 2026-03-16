@@ -7,6 +7,7 @@ import {
   RecentTestRuns,
   ProjectsOverview,
   TestRunsByStatus,
+  FlowTestingOverview,
 } from '../components/dashboard';
 import { useDashboardStats } from '../hooks/useDashboardStats';
 
@@ -31,6 +32,18 @@ const TestRunsIcon = () => (
 const PerfIcon = () => (
   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+  </svg>
+);
+
+const FlowIcon = () => (
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4zM7 10v4l5 3M17 14v-4l-5-3" />
+  </svg>
+);
+
+const GroupIcon = () => (
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
   </svg>
 );
 
@@ -64,7 +77,7 @@ export function EcommerceDashboardPage() {
 
   if (!stats) return null;
 
-  const { overview, security, recentTestRuns, recentProjects, testRunsByStatus, scoreHistory, topVulnerabilities } = stats;
+  const { overview, security, flowTesting, performance, recentTestRuns, recentProjects, testRunsByStatus, scoreHistory, topVulnerabilities } = stats;
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-8">
@@ -107,6 +120,34 @@ export function EcommerceDashboardPage() {
         />
       </div>
 
+      {/* Row 1b: Flow & Perf Stats */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <EcomStatCard
+          title="Flow Tests"
+          value={String(flowTesting?.totalFlows ?? 0)}
+          change={0}
+          icon={<FlowIcon />}
+        />
+        <EcomStatCard
+          title="Flow Groups"
+          value={String(flowTesting?.totalGroups ?? 0)}
+          change={0}
+          icon={<GroupIcon />}
+        />
+        <EcomStatCard
+          title="Flow Pass Rate"
+          value={flowTesting?.passRate > 0 ? `${flowTesting.passRate}%` : '—'}
+          change={0}
+          icon={<TestRunsIcon />}
+        />
+        <EcomStatCard
+          title="Avg Response (Perf)"
+          value={performance?.averageResponseTime > 0 ? `${performance.averageResponseTime}ms` : '—'}
+          change={0}
+          icon={<PerfIcon />}
+        />
+      </div>
+
       {/* Row 2: Security Score + Vulnerabilities */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SecurityScoreChart
@@ -120,10 +161,13 @@ export function EcommerceDashboardPage() {
       {/* Row 3: Score History */}
       <ScoreHistoryChart data={scoreHistory} />
 
-      {/* Row 4: Recent Test Runs */}
+      {/* Row 4: Flow Testing Overview */}
+      {flowTesting && <FlowTestingOverview data={flowTesting} />}
+
+      {/* Row 5: Recent Test Runs */}
       <RecentTestRuns runs={recentTestRuns} />
 
-      {/* Row 5: Projects + Test Runs by Status */}
+      {/* Row 6: Projects + Test Runs by Status */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ProjectsOverview projects={recentProjects} />
         <TestRunsByStatus data={testRunsByStatus} />

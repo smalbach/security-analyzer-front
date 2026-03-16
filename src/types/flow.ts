@@ -400,6 +400,117 @@ export interface FlowBatchProgressEvent {
   currentRow: number;
 }
 
+// ─── Flow Groups ─────────────────────────────────────────────────────────────
+
+export interface FlowGroup {
+  id: string;
+  projectId: string;
+  userId: string | null;
+  name: string;
+  description: string | null;
+  status: 'active' | 'archived';
+  items: FlowGroupItem[];
+  lastExecution?: FlowGroupExecution | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FlowGroupItem {
+  id: string;
+  groupId: string;
+  flowId: string;
+  sortOrder: number;
+  flow?: FlowDefinition;
+  createdAt: string;
+}
+
+export interface FlowGroupExecutionSummary {
+  totalFlows: number;
+  passedFlows: number;
+  failedFlows: number;
+  warningFlows: number;
+  totalNodes: number;
+  totalPassed: number;
+  totalFailed: number;
+  totalWarnings: number;
+  totalDurationMs: number;
+  flowResults: Array<{
+    flowId: string;
+    flowName: string;
+    executionId: string;
+    status: string;
+    summary: FlowExecutionSummary | null;
+    inheritedSnapshot: Record<string, unknown> | null;
+  }>;
+}
+
+export interface FlowGroupExecution {
+  id: string;
+  groupId: string;
+  projectId: string;
+  userId: string;
+  status: 'pending' | 'running' | 'completed' | 'completed_with_warnings' | 'failed' | 'cancelled';
+  totalFlows: number;
+  completedFlows: number;
+  failedFlows: number;
+  currentFlowId: string | null;
+  currentExecutionId: string | null;
+  summary: FlowGroupExecutionSummary | null;
+  error: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Flow Group DTOs ─────────────────────────────────────────────────────────
+
+export interface CreateFlowGroupRequest {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateFlowGroupRequest {
+  name?: string;
+  description?: string;
+  status?: 'active' | 'archived';
+}
+
+export interface ReorderGroupItemsRequest {
+  items: Array<{ flowId: string; sortOrder: number }>;
+}
+
+// ─── Flow Group WebSocket Events ─────────────────────────────────────────────
+
+export interface GroupFlowStartedEvent {
+  groupExecutionId: string;
+  flowId: string;
+  flowName: string;
+  flowIndex: number;
+  totalFlows: number;
+  executionId: string;
+}
+
+export interface GroupFlowCompletedEvent {
+  groupExecutionId: string;
+  flowId: string;
+  flowName: string;
+  flowIndex: number;
+  status: string;
+  summary: FlowExecutionSummary | null;
+  executionId: string;
+}
+
+export interface GroupExecutionCompletedEvent {
+  groupExecutionId: string;
+  summary: FlowGroupExecutionSummary;
+}
+
+export interface GroupExecutionFailedEvent {
+  groupExecutionId: string;
+  error: string;
+}
+
 // ─── Canvas Node Data (for @xyflow/react) ───────────────────────────────────
 
 export type FlowNodeStatus = 'pending' | 'running' | 'success' | 'warning' | 'error' | 'skipped' | 'retrying';
