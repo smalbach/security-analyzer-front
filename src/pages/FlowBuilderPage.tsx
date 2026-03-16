@@ -17,6 +17,8 @@ import { NodeConfigPanel } from '../components/flow-testing/panels/NodeConfigPan
 import { ExecutionTimeline } from '../components/flow-testing/execution/ExecutionTimeline';
 import { ExecutionReport } from '../components/flow-testing/execution/ExecutionReport';
 import { ValidationErrorsPanel } from '../components/flow-testing/ValidationErrorsPanel';
+import { useSessionTokenStore } from '../stores/sessionTokenStore';
+import { useEnvironmentStore } from '../stores/environmentStore';
 import type { FlowNodeType } from '../types/flow';
 import type { ProjectEnvironment } from '../types/environments';
 
@@ -24,6 +26,9 @@ function FlowBuilderContent() {
   const { projectId, flowId } = useParams<{ projectId: string; flowId: string }>();
   const { api } = useAuth();
   const apiBaseUrl: string = (api as any).baseUrl ?? '';
+
+  const setSessionToken = useSessionTokenStore((s) => s.setToken);
+  const invalidateEnvCache = useEnvironmentStore((s) => s.invalidate);
 
   const [environments, setEnvironments] = useState<ProjectEnvironment[]>([]);
   const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<string | null>(null);
@@ -149,6 +154,21 @@ function FlowBuilderContent() {
         error: e.error ?? null,
         errorSource: e.errorSource ?? null,
       });
+      // Capture token from environment updates (e.g. pm.environment.set("token", ...))
+      if (e.environmentUpdates && projectId) {
+        const token = e.environmentUpdates['token'];
+        if (token && typeof token === 'string') {
+          setSessionToken(projectId, token);
+        }
+        // Invalidate env cache so FloatingEnvButton refreshes from DB
+        invalidateEnvCache(projectId);
+      }
+      // Also capture token from auth node extractedValues
+      if (e.extractedValues?.token && projectId) {
+        const token = String(e.extractedValues.token);
+        setSessionToken(projectId, token);
+        invalidateEnvCache(projectId);
+      }
       // Clear edge animation for completed node
       const state = useFlowBuilderStore.getState();
       useFlowBuilderStore.setState({

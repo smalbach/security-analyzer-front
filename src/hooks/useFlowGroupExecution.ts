@@ -16,6 +16,7 @@ interface FlowResult {
   status: string;
   summary: FlowExecutionSummary | null;
   executionId: string;
+  error?: string | null;
 }
 
 interface UseFlowGroupExecutionArgs {
@@ -98,6 +99,7 @@ export function useFlowGroupExecution({
           status: data.status,
           summary: data.summary,
           executionId: data.executionId,
+          error: data.error || null,
         },
       ]);
     });

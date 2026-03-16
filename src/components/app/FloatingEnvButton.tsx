@@ -84,9 +84,10 @@ export function FloatingEnvButton() {
     }
   }, [activeProject, open, fetchEnvironments]);
 
-  // Fetch active env on project change
+  // Fetch active env on project change or when cache is invalidated
   useEffect(() => {
     if (!activeProject) return;
+    if (activeEnv) return; // Already in cache
     void (async () => {
       try {
         const env = await api.getActiveEnvironment(activeProject.id);
@@ -95,7 +96,7 @@ export function FloatingEnvButton() {
         // ignore
       }
     })();
-  }, [activeProject, api, setActiveEnvInStore]);
+  }, [activeProject, activeEnv, api, setActiveEnvInStore]);
 
   // Close dropdown on click outside
   useEffect(() => {

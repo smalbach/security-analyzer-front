@@ -356,6 +356,7 @@ export interface FlowNodeCompletedEvent {
   responseData?: FlowNodeResponseData | null;
   errorSource?: ErrorSource | null;
   error?: string | null;
+  environmentUpdates?: Record<string, unknown> | null;
 }
 
 export interface FlowNodeFailedEvent {
@@ -441,6 +442,7 @@ export interface FlowGroupExecutionSummary {
     status: string;
     summary: FlowExecutionSummary | null;
     inheritedSnapshot: Record<string, unknown> | null;
+    error?: string | null;
   }>;
 }
 
@@ -499,6 +501,7 @@ export interface GroupFlowCompletedEvent {
   status: string;
   summary: FlowExecutionSummary | null;
   executionId: string;
+  error?: string | null;
 }
 
 export interface GroupExecutionCompletedEvent {

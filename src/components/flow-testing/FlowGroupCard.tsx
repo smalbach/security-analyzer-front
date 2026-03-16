@@ -75,7 +75,7 @@ interface FlowGroupCardProps {
   currentFlowName: string;
   completedFlows: number;
   totalFlowsRunning: number;
-  flowResults: Array<{ flowId: string; status: string; summary: FlowExecutionSummary | null }>;
+  flowResults: Array<{ flowId: string; status: string; summary: FlowExecutionSummary | null; error?: string | null }>;
   onUpdateGroupName: (groupId: string, name: string) => Promise<void>;
   onUpdateFlowName: (flowId: string, name: string) => Promise<void>;
   onDeleteGroup: (groupId: string) => void;
@@ -131,6 +131,19 @@ export function FlowGroupCard({
       if (!lastExec?.summary?.flowResults) return undefined;
       const fr = lastExec.summary.flowResults.find((r) => r.flowId === flowId);
       return fr?.status;
+    },
+    [getFlowRunResult, lastExec],
+  );
+
+  const getFlowError = useCallback(
+    (flowId: string): string | undefined => {
+      // During execution, use live results
+      const live = getFlowRunResult(flowId);
+      if (live?.error) return live.error;
+      // Otherwise check last group execution summary
+      if (!lastExec?.summary?.flowResults) return undefined;
+      const fr = lastExec.summary.flowResults.find((r) => r.flowId === flowId);
+      return fr?.error || undefined;
     },
     [getFlowRunResult, lastExec],
   );
@@ -274,6 +287,7 @@ export function FlowGroupCard({
                       totalItems={items.length}
                       projectId={projectId}
                       flowStatus={getFlowLastStatus(item.flowId)}
+                      errorMessage={getFlowError(item.flowId)}
                       isGroupRunning={isRunning}
                       isCurrentlyRunning={isRunning && currentFlowIndex === idx}
                       onUpdateName={onUpdateFlowName}
@@ -300,6 +314,7 @@ interface FlowItemRowProps {
   totalItems: number;
   projectId: string;
   flowStatus?: string;
+  errorMessage?: string;
   isGroupRunning: boolean;
   isCurrentlyRunning: boolean;
   onUpdateName: (flowId: string, name: string) => Promise<void>;
@@ -313,6 +328,7 @@ function FlowItemRow({
   index,
   totalItems,
   flowStatus,
+  errorMessage,
   isGroupRunning,
   isCurrentlyRunning,
   onUpdateName,
@@ -369,13 +385,20 @@ function FlowItemRow({
         title={flowStatus || 'Not run'}
       />
 
-      {/* Flow name (inline editable) */}
-      <InlineEditableName
-        value={flowName}
-        onSave={(name) => onUpdateName(item.flowId, name)}
-        className="min-w-0 flex-1 truncate text-slate-200"
-        disabled={isGroupRunning}
-      />
+      {/* Flow name and error */}
+      <div className="min-w-0 flex-1">
+        <InlineEditableName
+          value={flowName}
+          onSave={(name) => onUpdateName(item.flowId, name)}
+          className="truncate text-slate-200"
+          disabled={isGroupRunning}
+        />
+        {flowStatus === 'failed' && errorMessage && (
+          <p className="mt-0.5 truncate text-[10px] text-rose-400/80" title={errorMessage}>
+            {errorMessage}
+          </p>
+        )}
+      </div>
 
       {/* Running indicator */}
       {isCurrentlyRunning && (
