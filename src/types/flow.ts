@@ -152,6 +152,8 @@ export interface FlowEdge {
 
 // ─── Execution ──────────────────────────────────────────────────────────────
 
+export type ErrorSource = 'network' | 'auth' | 'target_api_4xx' | 'target_api_5xx' | 'config' | 'script' | 'assertion' | 'unknown';
+
 export interface FlowExecutionSummary {
   totalNodes: number;
   passed: number;
@@ -161,6 +163,7 @@ export interface FlowExecutionSummary {
   durationMs: number;
   assertionsPassed: number;
   assertionsFailed: number;
+  httpStatusDistribution?: Record<number, number>;
 }
 
 export interface FlowExecution {
@@ -235,6 +238,7 @@ export interface FlowNodeExecution {
   assertionResults: FlowAssertionResult[] | null;
   scriptOutput: FlowScriptOutput | null;
   error: string | null;
+  errorSource?: ErrorSource | null;
   createdAt: string;
 }
 
@@ -348,6 +352,10 @@ export interface FlowNodeCompletedEvent {
   schemaValidation?: FlowSchemaValidationResult;
   assertionResults?: FlowAssertionResult[];
   scriptOutput?: FlowScriptOutput;
+  requestSnapshot?: FlowNodeRequestSnapshot | null;
+  responseData?: FlowNodeResponseData | null;
+  errorSource?: ErrorSource | null;
+  error?: string | null;
 }
 
 export interface FlowNodeFailedEvent {
@@ -357,6 +365,8 @@ export interface FlowNodeFailedEvent {
   error: string;
   willRetry?: boolean;
   responseData?: FlowNodeResponseData | null;
+  requestSnapshot?: FlowNodeRequestSnapshot | null;
+  errorSource?: ErrorSource | null;
 }
 
 export interface FlowNodeRetryingEvent {

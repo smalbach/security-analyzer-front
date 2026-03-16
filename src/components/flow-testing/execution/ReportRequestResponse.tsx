@@ -24,23 +24,25 @@ function formatJson(data: unknown): string {
   return JSON.stringify(data, null, 2);
 }
 
-function CollapsibleSection({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+function CollapsibleSection({ title, children, defaultOpen = false, count }: { title: string; children: React.ReactNode; defaultOpen?: boolean; count?: number }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 text-[10px] font-medium text-slate-500 hover:text-slate-300 transition"
+        className="flex items-center gap-1 text-[10px] font-semibold uppercase text-slate-500 hover:text-slate-300 transition"
       >
-        <span>{open ? '▾' : '▸'}</span> {title}
+        <span className="text-[9px]">{open ? '▾' : '▸'}</span>
+        <span>{title}</span>
+        {count != null && <span className="text-slate-600 font-normal normal-case">({count})</span>}
       </button>
       {open && <div className="mt-1">{children}</div>}
     </div>
   );
 }
 
-function JsonBlock({ data, maxLines = 50 }: { data: unknown; maxLines?: number }) {
+function JsonBlock({ data, maxLines = 60 }: { data: unknown; maxLines?: number }) {
   const [showAll, setShowAll] = useState(false);
   const formatted = formatJson(data);
   const lines = formatted.split('\n');
@@ -49,7 +51,7 @@ function JsonBlock({ data, maxLines = 50 }: { data: unknown; maxLines?: number }
 
   return (
     <div>
-      <pre className="max-h-[300px] overflow-auto rounded bg-black/30 px-2 py-1.5 text-[10px] text-slate-400 font-mono whitespace-pre-wrap break-all">
+      <pre className="max-h-[400px] overflow-auto rounded bg-black/30 px-2.5 py-2 text-[10px] text-slate-300 font-mono whitespace-pre-wrap break-all leading-relaxed">
         {display}
       </pre>
       {truncated && (
@@ -65,131 +67,170 @@ function JsonBlock({ data, maxLines = 50 }: { data: unknown; maxLines?: number }
   );
 }
 
+function HeadersTable({ headers }: { headers: Record<string, string> }) {
+  return (
+    <div className="rounded bg-black/20 overflow-hidden">
+      <table className="w-full text-[10px]">
+        <tbody>
+          {Object.entries(headers).map(([key, value]) => (
+            <tr key={key} className="border-b border-white/[0.03] last:border-0">
+              <td className="px-2 py-1 font-mono text-sky-400 whitespace-nowrap align-top w-[1%]">{key}</td>
+              <td className="px-2 py-1 font-mono text-slate-400 break-all">{value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 interface ReportRequestResponseProps {
   request: FlowNodeRequestSnapshot | null;
   response: FlowNodeResponseData | null;
 }
 
 export function ReportRequestResponse({ request, response }: ReportRequestResponseProps) {
-  const [tab, setTab] = useState<'request' | 'response'>('request');
+  const [tab, setTab] = useState<'request' | 'response'>(response ? 'response' : 'request');
 
   if (!request && !response) return null;
 
   return (
-    <div className="rounded-lg border border-white/5 bg-white/[0.02]">
-      {/* Tabs */}
-      <div className="flex border-b border-white/5">
-        {request && (
-          <button
-            type="button"
-            onClick={() => setTab('request')}
-            className={cn(
-              'px-3 py-1.5 text-[10px] font-medium transition',
-              tab === 'request' ? 'text-slate-200 border-b border-sky-400' : 'text-slate-500 hover:text-slate-300',
-            )}
-          >
-            Request
-          </button>
-        )}
-        {response && (
-          <button
-            type="button"
-            onClick={() => setTab('response')}
-            className={cn(
-              'px-3 py-1.5 text-[10px] font-medium transition',
-              tab === 'response' ? 'text-slate-200 border-b border-sky-400' : 'text-slate-500 hover:text-slate-300',
-            )}
-          >
-            Response
-          </button>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="p-2.5 space-y-2">
-        {tab === 'request' && request && (
-          <>
-            {/* Method + URL */}
-            <div className="flex items-center gap-2">
-              <span className={cn('rounded border px-1.5 py-0.5 text-[10px] font-bold', METHOD_COLORS[request.method] || 'text-slate-400')}>
-                {request.method}
-              </span>
-              <span className="text-[11px] text-slate-300 font-mono break-all">{request.url}</span>
-            </div>
-
-            {/* Headers */}
-            {request.headers && Object.keys(request.headers).length > 0 && (
-              <CollapsibleSection title={`Headers (${Object.keys(request.headers).length})`}>
-                <div className="space-y-0.5">
-                  {Object.entries(request.headers).map(([key, value]) => (
-                    <div key={key} className="flex gap-1 text-[10px]">
-                      <span className="font-mono text-slate-500">{key}:</span>
-                      <span className="font-mono text-slate-400 break-all">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </CollapsibleSection>
-            )}
-
-            {/* Body */}
-            {request.body != null && (
-              <CollapsibleSection title="Body" defaultOpen>
-                <JsonBlock data={request.body} />
-              </CollapsibleSection>
-            )}
-
-            {/* Query params */}
-            {request.queryParams && Object.keys(request.queryParams).length > 0 && (
-              <CollapsibleSection title="Query Parameters">
-                <div className="space-y-0.5">
-                  {Object.entries(request.queryParams).map(([key, value]) => (
-                    <div key={key} className="flex gap-1 text-[10px]">
-                      <span className="font-mono text-emerald-400">{key}=</span>
-                      <span className="font-mono text-slate-400">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </CollapsibleSection>
-            )}
-          </>
-        )}
-
-        {tab === 'response' && response && (
-          <>
-            {/* Status + Time */}
-            <div className="flex items-center gap-2">
-              <span className={cn('rounded border px-1.5 py-0.5 text-[10px] font-bold', statusColor(response.statusCode))}>
-                {response.statusCode}
-              </span>
-              <span className="text-[10px] text-slate-500">{response.responseTimeMs}ms</span>
-              {response.dnsTimeMs != null && (
-                <span className="text-[10px] text-slate-600">DNS {response.dnsTimeMs}ms</span>
+    <div className="space-y-1">
+      <div className="text-[10px] font-semibold uppercase text-slate-500">HTTP Request / Response</div>
+      <div className="rounded-lg border border-white/5 bg-white/[0.02]">
+        {/* Tabs */}
+        <div className="flex border-b border-white/5">
+          {request && (
+            <button
+              type="button"
+              onClick={() => setTab('request')}
+              className={cn(
+                'px-3 py-1.5 text-[10px] font-medium transition',
+                tab === 'request' ? 'text-slate-200 border-b-2 border-sky-400' : 'text-slate-500 hover:text-slate-300',
               )}
-              {response.tlsTimeMs != null && (
-                <span className="text-[10px] text-slate-600">TLS {response.tlsTimeMs}ms</span>
+            >
+              Request
+            </button>
+          )}
+          {response && (
+            <button
+              type="button"
+              onClick={() => setTab('response')}
+              className={cn(
+                'px-3 py-1.5 text-[10px] font-medium transition',
+                tab === 'response' ? 'text-slate-200 border-b-2 border-sky-400' : 'text-slate-500 hover:text-slate-300',
               )}
-            </div>
+            >
+              Response
+              {response.statusCode && (
+                <span className={cn('ml-1.5 rounded border px-1 py-0.5 text-[9px] font-bold', statusColor(response.statusCode))}>
+                  {response.statusCode}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
 
-            {/* Headers */}
-            {response.headers && Object.keys(response.headers).length > 0 && (
-              <CollapsibleSection title={`Headers (${Object.keys(response.headers).length})`}>
-                <div className="space-y-0.5">
-                  {Object.entries(response.headers).map(([key, value]) => (
-                    <div key={key} className="flex gap-1 text-[10px]">
-                      <span className="font-mono text-slate-500">{key}:</span>
-                      <span className="font-mono text-slate-400 break-all">{value}</span>
-                    </div>
-                  ))}
+        {/* Content */}
+        <div className="p-3 space-y-3">
+          {tab === 'request' && request && (
+            <>
+              {/* Method + URL */}
+              <div className="flex items-start gap-2">
+                <span className={cn('rounded border px-1.5 py-0.5 text-[10px] font-bold shrink-0', METHOD_COLORS[request.method] || 'text-slate-400')}>
+                  {request.method}
+                </span>
+                <span className="text-[11px] text-slate-200 font-mono break-all leading-relaxed">{request.url}</span>
+              </div>
+
+              {/* Headers — open by default */}
+              {request.headers && Object.keys(request.headers).length > 0 && (
+                <CollapsibleSection title="Headers" count={Object.keys(request.headers).length} defaultOpen>
+                  <HeadersTable headers={request.headers} />
+                </CollapsibleSection>
+              )}
+
+              {/* Query params */}
+              {request.queryParams && Object.keys(request.queryParams).length > 0 && (
+                <CollapsibleSection title="Query Parameters" count={Object.keys(request.queryParams).length} defaultOpen>
+                  <div className="rounded bg-black/20 overflow-hidden">
+                    <table className="w-full text-[10px]">
+                      <tbody>
+                        {Object.entries(request.queryParams).map(([key, value]) => (
+                          <tr key={key} className="border-b border-white/[0.03] last:border-0">
+                            <td className="px-2 py-1 font-mono text-emerald-400 whitespace-nowrap align-top w-[1%]">{key}</td>
+                            <td className="px-2 py-1 font-mono text-slate-400 break-all">{value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CollapsibleSection>
+              )}
+
+              {/* Body */}
+              {request.body != null && (
+                <CollapsibleSection title="Request Body" defaultOpen>
+                  <JsonBlock data={request.body} />
+                </CollapsibleSection>
+              )}
+
+              {/* No body indicator */}
+              {request.body == null && (
+                <div className="text-[10px] text-slate-600 italic">No request body</div>
+              )}
+            </>
+          )}
+
+          {tab === 'response' && response && (
+            <>
+              {/* Status + Time */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500">Status:</span>
+                  <span className={cn('rounded border px-2 py-0.5 text-[11px] font-bold', statusColor(response.statusCode))}>
+                    {response.statusCode}
+                  </span>
                 </div>
-              </CollapsibleSection>
-            )}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500">Response time:</span>
+                  <span className="text-[11px] font-mono text-slate-300">{response.responseTimeMs}ms</span>
+                </div>
+                {response.dnsTimeMs != null && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-600">DNS:</span>
+                    <span className="text-[10px] font-mono text-slate-400">{response.dnsTimeMs}ms</span>
+                  </div>
+                )}
+                {response.tlsTimeMs != null && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-600">TLS:</span>
+                    <span className="text-[10px] font-mono text-slate-400">{response.tlsTimeMs}ms</span>
+                  </div>
+                )}
+                {response.downloadTimeMs != null && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-600">Download:</span>
+                    <span className="text-[10px] font-mono text-slate-400">{response.downloadTimeMs}ms</span>
+                  </div>
+                )}
+              </div>
 
-            {/* Body */}
-            <CollapsibleSection title="Body" defaultOpen>
-              <JsonBlock data={response.body} />
-            </CollapsibleSection>
-          </>
-        )}
+              {/* Headers — open by default */}
+              {response.headers && Object.keys(response.headers).length > 0 && (
+                <CollapsibleSection title="Response Headers" count={Object.keys(response.headers).length} defaultOpen>
+                  <HeadersTable headers={response.headers} />
+                </CollapsibleSection>
+              )}
+
+              {/* Body — always visible */}
+              <div>
+                <div className="text-[10px] font-semibold uppercase text-slate-500 mb-1">Response Body</div>
+                <JsonBlock data={response.body} />
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

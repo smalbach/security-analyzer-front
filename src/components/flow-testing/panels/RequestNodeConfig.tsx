@@ -2,6 +2,7 @@ import { ConfigField, ConfigSelect } from './ConfigField';
 import { EndpointPicker } from './EndpointPicker';
 import { JsonEditor } from './JsonEditor';
 import { TemplateInput } from './TemplateInput';
+import { AvailableVariables } from './AvailableVariables';
 import { useTemplateCompletions } from '../../../hooks/useTemplateCompletions';
 import type { ApiEndpoint } from '../../../types/api';
 
@@ -48,6 +49,8 @@ export function RequestNodeConfig({ config, onChange, projectId }: RequestNodeCo
 
   return (
     <div className="space-y-3">
+      <AvailableVariables projectId={projectId} />
+
       <ConfigField label="Select from endpoints" help="Pick an existing endpoint from your project. Its method, URL, headers, query params, and body will be auto-filled.">
         <EndpointPicker
           projectId={projectId}
@@ -57,12 +60,12 @@ export function RequestNodeConfig({ config, onChange, projectId }: RequestNodeCo
         />
       </ConfigField>
 
-      <ConfigField label="URL" help="Request URL. Use {{env.baseUrl}} for the environment base URL, {{nodeId.extractorName}} for upstream values. Type {{ to see available variables.">
+      <ConfigField label="URL" help="Enter a path like /api/users or /v2/campaigns/{id} — the base URL from your environment is prepended automatically. Use {param} for path parameters (resolved from env vars or upstream extractors), {{env.key}} for templates. Full URLs (https://...) are used as-is.">
         <TemplateInput
           value={String(config.url || '')}
           onChange={(v) => update('url', v)}
           completions={completions}
-          placeholder="{{env.baseUrl}}/api/users"
+          placeholder="/api/users/{userId}"
         />
       </ConfigField>
 
@@ -71,7 +74,7 @@ export function RequestNodeConfig({ config, onChange, projectId }: RequestNodeCo
           options={['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map((m) => ({ value: m, label: m }))} />
       </ConfigField>
 
-      <ConfigField label="Headers (JSON)" help="HTTP headers. JSON key-value pairs. Type {{ inside a value to see available variables.">
+      <ConfigField label="Headers (JSON)" help={'HTTP headers as JSON. Values support {{env.key}}, {{var.key}}, and {{nodeId.extractor}} templates. Remember to quote values: "Bearer {{token}}". Type {{ to see available variables.'}>
         <JsonEditor
           value={typeof config.headers === 'string' ? config.headers : JSON.stringify(config.headers || {}, null, 2)}
           onChange={(raw) => { try { update('headers', JSON.parse(raw)); } catch { update('headers', raw); } }}
@@ -81,7 +84,7 @@ export function RequestNodeConfig({ config, onChange, projectId }: RequestNodeCo
         />
       </ConfigField>
 
-      <ConfigField label="Query Params (JSON)" help="URL query parameters as key-value pairs. Type {{ inside a value to see available variables.">
+      <ConfigField label="Query Params (JSON)" help="URL query params as JSON. Supports {{env.key}}, {{var.key}}, and {{nodeId.extractor}} templates. Type {{ to see available variables.">
         <JsonEditor
           value={typeof config.queryParams === 'string' ? config.queryParams : JSON.stringify(config.queryParams || {}, null, 2)}
           onChange={(raw) => { try { update('queryParams', JSON.parse(raw)); } catch { update('queryParams', raw); } }}
@@ -91,7 +94,7 @@ export function RequestNodeConfig({ config, onChange, projectId }: RequestNodeCo
         />
       </ConfigField>
 
-      <ConfigField label="Body (JSON)" help="Request body. Type {{ inside a value to see available template variables.">
+      <ConfigField label="Body (JSON)" help="Request body as JSON. Supports {{env.key}}, {{var.key}}, and {{nodeId.extractor}} templates. Type {{ to see available variables.">
         <JsonEditor
           value={typeof config.body === 'string' ? config.body : JSON.stringify(config.body || null, null, 2)}
           onChange={(raw) => { try { update('body', JSON.parse(raw)); } catch { update('body', raw); } }}

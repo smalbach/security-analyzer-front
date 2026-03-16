@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { cn } from '../../../lib/cn';
 import { useFlowBuilderStore } from '../../../stores/flowBuilderStore';
-import type { FlowNodeStatus, FlowNodeExecution, FlowCanvasNodeData, FlowAssertionResult, FlowSchemaValidationResult } from '../../../types/flow';
+import { ReportRequestResponse } from './ReportRequestResponse';
+import type { FlowNodeStatus, FlowNodeExecution, FlowCanvasNodeData, FlowAssertionResult, FlowSchemaValidationResult, ErrorSource } from '../../../types/flow';
 
 // ── Status visual maps ──────────────────────────────────────────────────────
 const STATUS_DOT: Record<FlowNodeStatus, string> = {
@@ -34,55 +35,80 @@ const STATUS_BG: Record<FlowNodeStatus, string> = {
   retrying: 'border-orange-500/10 bg-orange-500/[0.02]',
 };
 
+const METHOD_COLORS: Record<string, string> = {
+  GET: 'text-emerald-400 bg-emerald-500/10',
+  POST: 'text-sky-400 bg-sky-500/10',
+  PUT: 'text-amber-400 bg-amber-500/10',
+  PATCH: 'text-orange-400 bg-orange-500/10',
+  DELETE: 'text-red-400 bg-red-500/10',
+};
+
+const ERROR_SOURCE_LABELS: Record<ErrorSource, string> = {
+  network: 'Network Error',
+  auth: 'Auth Error',
+  target_api_4xx: 'API Error 4xx',
+  target_api_5xx: 'API Error 5xx',
+  config: 'Config Error',
+  script: 'Script Error',
+  assertion: 'Assertion Failed',
+  unknown: 'Error',
+};
+
+const ERROR_SOURCE_COLORS: Record<ErrorSource, string> = {
+  network: 'border-orange-500/20 bg-orange-500/10 text-orange-400',
+  auth: 'border-red-500/20 bg-red-500/10 text-red-400',
+  target_api_4xx: 'border-amber-500/20 bg-amber-500/10 text-amber-400',
+  target_api_5xx: 'border-red-500/20 bg-red-500/10 text-red-400',
+  config: 'border-violet-500/20 bg-violet-500/10 text-violet-400',
+  script: 'border-sky-500/20 bg-sky-500/10 text-sky-400',
+  assertion: 'border-amber-500/20 bg-amber-500/10 text-amber-400',
+  unknown: 'border-slate-500/20 bg-slate-500/10 text-slate-400',
+};
+
+function statusCodeColor(code: number): string {
+  if (code < 300) return 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10';
+  if (code < 400) return 'text-amber-400 border-amber-500/20 bg-amber-500/10';
+  return 'text-red-400 border-red-500/20 bg-red-500/10';
+}
+
 // ── Error remediation hints ─────────────────────────────────────────────────
 function getErrorHint(error: string, nodeType: string): string | null {
   const e = error.toLowerCase();
 
-  // Connection / network errors
   if (e.includes('econnrefused') || e.includes('enotfound') || e.includes('network'))
-    return '💡 Check that the target server is running and the URL is correct. If using localhost, ensure the service is up.';
+    return 'Check that the target server is running and the URL is correct. If using localhost, ensure the service is up.';
   if (e.includes('timeout'))
-    return '💡 The request took too long. Check the server health or increase the timeout in retry config.';
+    return 'The request took too long. Check the server health or increase the timeout in retry config.';
   if (e.includes('certificate') || e.includes('ssl') || e.includes('tls'))
-    return '💡 SSL/TLS certificate issue. The server may use a self-signed certificate. Check the URL scheme (http vs https).';
-
-  // Auth errors
+    return 'SSL/TLS certificate issue. The server may use a self-signed certificate. Check the URL scheme (http vs https).';
   if (e.includes('token') && (e.includes('not found') || e.includes('extract') || e.includes('undefined')))
-    return '💡 Token extraction failed. Verify the "Token Path" field matches the actual response structure (e.g. "data.token" or "accessToken").';
+    return 'Token extraction failed. Verify the "Token Path" field matches the actual response structure (e.g. "data.token" or "accessToken").';
   if (e.includes('401') || e.includes('unauthorized'))
-    return '💡 Authentication failed. Check your credentials, or ensure the Auth node runs before this request and the token is being passed correctly.';
+    return 'Authentication failed. Check your credentials, or ensure the Auth node runs before this request.';
   if (e.includes('403') || e.includes('forbidden'))
-    return '💡 Permission denied. The authenticated user may not have access to this resource.';
-
-  // HTTP status errors
+    return 'Permission denied. The authenticated user may not have access to this resource.';
   if (e.includes('404') || e.includes('not found'))
-    return '💡 Resource not found. Verify the URL path and any dynamic segments (e.g. {{prev.body.id}}).';
+    return 'Resource not found. Verify the URL path and any dynamic segments.';
   if (e.includes('400') || e.includes('bad request'))
-    return '💡 Bad request. Check the request body, headers, and query parameters for missing or malformed fields.';
+    return 'Bad request. Check the request body, headers, and query parameters.';
   if (e.includes('500') || e.includes('internal server'))
-    return '💡 Server error. This is a backend issue — check the server logs.';
+    return 'Server error. This is a backend issue — check the server logs.';
   if (e.includes('422') || e.includes('unprocessable'))
-    return '💡 Validation error from the server. Check that the request body matches the expected schema.';
-
-  // Script errors
+    return 'Validation error from the server. Check that the request body matches the expected schema.';
   if (e.includes('script') && e.includes('timeout'))
-    return '💡 Script exceeded 5s timeout. Simplify the script logic or remove infinite loops.';
+    return 'Script exceeded 5s timeout. Simplify the script logic or remove infinite loops.';
   if (e.includes('referenceerror') || e.includes('is not defined'))
-    return '💡 Variable not defined in script. Available APIs: flow.variables, flow.environment, flow.response, flow.test(), flow.expect().';
+    return 'Variable not defined in script. Available APIs: flow.variables, flow.environment, flow.response, flow.test(), flow.expect().';
   if (e.includes('syntaxerror'))
-    return '💡 JavaScript syntax error in the script. Check for missing brackets, semicolons, or typos.';
+    return 'JavaScript syntax error in the script. Check for missing brackets, semicolons, or typos.';
   if (e.includes('typeerror'))
-    return '💡 Type error in script. A value is null/undefined when you expected an object. Add null checks.';
-
-  // Condition / loop errors
+    return 'Type error in script. A value is null/undefined when you expected an object. Add null checks.';
   if (nodeType === 'condition' && (e.includes('expression') || e.includes('resolve')))
-    return '💡 Condition expression could not be evaluated. Check that upstream nodes provide the expected data and the template syntax is correct.';
+    return 'Condition expression could not be evaluated. Check that upstream nodes provide the expected data.';
   if (nodeType === 'loop' && (e.includes('array') || e.includes('iterate')))
-    return '💡 Loop source did not resolve to an array. Verify the source expression points to an array in the upstream response.';
-
-  // Assertion failures
+    return 'Loop source did not resolve to an array. Verify the source expression points to an array.';
   if (e.includes('assertion'))
-    return '💡 One or more assertions failed. Click to expand and see which checks didn\'t pass.';
+    return 'One or more assertions failed. Expand to see details.';
 
   return null;
 }
@@ -157,7 +183,7 @@ export function ExecutionTimeline() {
   const hasAnyResults = Object.keys(nodeResults).length > 0 || Object.keys(nodeStatuses).length > 0;
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-10 max-h-[320px] overflow-y-auto border-t border-[var(--surface-border)] bg-[rgba(var(--bg-900),0.97)] backdrop-blur-xl">
+    <div className="absolute bottom-0 left-0 right-0 z-10 max-h-[420px] overflow-y-auto border-t border-[var(--surface-border)] bg-[rgba(var(--bg-900),0.97)] backdrop-blur-xl">
       {/* Header */}
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/5 bg-[rgba(var(--bg-900),0.98)] px-3 py-1.5">
         <span className="text-xs font-semibold text-slate-200">Execution Timeline</span>
@@ -199,8 +225,12 @@ export function ExecutionTimeline() {
 
           const nodeData = node.data as unknown as FlowCanvasNodeData;
           const isExpanded = expandedNodes.has(node.id);
-          const hasDetails = result && (result.error || result.assertionResults?.length || result.schemaValidation || result.scriptOutput);
+          const hasDetails = result && (
+            result.error || result.assertionResults?.length || result.schemaValidation ||
+            result.scriptOutput || result.requestSnapshot || result.responseData
+          );
           const errorHint = result?.error ? getErrorHint(result.error, nodeData.nodeType) : null;
+          const errorSource = result?.errorSource as ErrorSource | undefined;
 
           return (
             <div
@@ -217,28 +247,54 @@ export function ExecutionTimeline() {
                 className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs"
               >
                 <div className={cn('h-2 w-2 flex-shrink-0 rounded-full', STATUS_DOT[status])} />
-                <span className="min-w-[90px] font-medium text-slate-200 truncate">
+                <span className="min-w-[80px] max-w-[120px] font-medium text-slate-200 truncate">
                   {nodeData.label}
                 </span>
                 <span className={cn('shrink-0 text-[10px] font-semibold uppercase', STATUS_TEXT[status])}>
                   {status}
                 </span>
 
+                {/* HTTP method + URL for request/auth nodes */}
+                {(nodeData.nodeType === 'auth' || nodeData.nodeType === 'request') && result?.requestSnapshot && (
+                  <span className="flex items-center gap-1 text-[10px] min-w-0">
+                    <span className={cn('rounded px-1 py-0.5 font-bold text-[9px] shrink-0', METHOD_COLORS[result.requestSnapshot.method] || 'text-slate-400 bg-slate-500/10')}>
+                      {result.requestSnapshot.method}
+                    </span>
+                    <span className="text-slate-500 truncate max-w-[180px] font-mono text-[9px]">
+                      {result.requestSnapshot.url}
+                    </span>
+                  </span>
+                )}
+
+                {/* Response status code */}
+                {result?.responseData?.statusCode != null && (
+                  <span className={cn('rounded border px-1 py-0.5 text-[9px] font-bold shrink-0', statusCodeColor(result.responseData.statusCode))}>
+                    {result.responseData.statusCode}
+                  </span>
+                )}
+
                 {/* Duration */}
                 {result?.durationMs != null && (
-                  <span className="text-[10px] text-slate-500">{result.durationMs}ms</span>
+                  <span className="text-[10px] text-slate-500 shrink-0">{result.durationMs}ms</span>
                 )}
 
                 {/* Retry badge */}
                 {retry && (
-                  <span className="rounded border border-orange-500/20 bg-orange-500/10 px-1 text-[10px] text-orange-400">
+                  <span className="rounded border border-orange-500/20 bg-orange-500/10 px-1 text-[10px] text-orange-400 shrink-0">
                     retry {retry.attempt}/{retry.maxRetries}
                   </span>
                 )}
 
+                {/* Error source badge */}
+                {errorSource && status === 'error' && !isExpanded && (
+                  <span className={cn('rounded-full border px-1.5 py-0.5 text-[9px] font-medium shrink-0', ERROR_SOURCE_COLORS[errorSource])}>
+                    {ERROR_SOURCE_LABELS[errorSource]}
+                  </span>
+                )}
+
                 {/* Assertion summary */}
-                {result?.assertionResults && result.assertionResults.length > 0 && (
-                  <span className="text-[10px]">
+                {result?.assertionResults && result.assertionResults.length > 0 && !errorSource && (
+                  <span className="text-[10px] shrink-0">
                     <span className="text-emerald-400">{result.assertionResults.filter((a) => a.passed).length}</span>
                     <span className="text-slate-600">/</span>
                     <span className={result.assertionResults.some((a) => !a.passed) ? 'text-red-400' : 'text-emerald-400'}>
@@ -249,7 +305,7 @@ export function ExecutionTimeline() {
                 )}
 
                 {/* Compact error preview */}
-                {result?.error && !isExpanded && (
+                {result?.error && !isExpanded && !errorSource && (
                   <span className="ml-auto max-w-[200px] truncate text-[10px] text-red-400" title={result.error}>
                     {result.error}
                   </span>
@@ -257,7 +313,7 @@ export function ExecutionTimeline() {
 
                 {/* Expand indicator */}
                 {hasDetails && (
-                  <span className="ml-auto text-[10px] text-slate-600">
+                  <span className="ml-auto text-[10px] text-slate-600 shrink-0">
                     {isExpanded ? '▾' : '▸'}
                   </span>
                 )}
@@ -265,10 +321,36 @@ export function ExecutionTimeline() {
 
               {/* Expanded details */}
               {isExpanded && result && (
-                <div className="border-t border-white/5 px-3 py-2 text-[11px]">
-                  {/* Error message + hint */}
-                  {result.error && (
-                    <div className="mb-2">
+                <div className="border-t border-white/5 px-3 py-2 text-[11px] space-y-2">
+                  {/* Error source badge (expanded) */}
+                  {errorSource && result.error && (
+                    <div className="flex items-start gap-2">
+                      <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium shrink-0', ERROR_SOURCE_COLORS[errorSource])}>
+                        {ERROR_SOURCE_LABELS[errorSource]}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="rounded-lg bg-red-500/[0.06] px-2 py-1.5 text-[11px] text-red-300 font-mono whitespace-pre-wrap break-all">
+                          {result.error}
+                        </div>
+                        {errorHint && (
+                          <div className="mt-1.5 rounded-lg bg-sky-500/[0.06] border border-sky-500/10 px-2 py-1.5 text-[11px] text-sky-300">
+                            {errorHint}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => { selectNode(node.id); setConfigPanelTab('config'); }}
+                          className="mt-1.5 text-[10px] text-sky-400 hover:text-sky-300 hover:underline transition"
+                        >
+                          Open node config →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error without source (fallback) */}
+                  {!errorSource && result.error && (
+                    <div>
                       <div className="mb-0.5 font-medium text-red-400">Error:</div>
                       <div className="rounded-lg bg-red-500/[0.06] px-2 py-1.5 text-[11px] text-red-300 font-mono whitespace-pre-wrap break-all">
                         {result.error}
@@ -290,9 +372,17 @@ export function ExecutionTimeline() {
 
                   {/* Skipped reason */}
                   {status === 'skipped' && result.error && (
-                    <div className="mb-2 text-slate-400">
+                    <div className="text-slate-400">
                       <span className="font-medium text-slate-300">Reason:</span> {result.error}
                     </div>
+                  )}
+
+                  {/* Request / Response viewer */}
+                  {(result.requestSnapshot || result.responseData) && (
+                    <ReportRequestResponse
+                      request={result.requestSnapshot}
+                      response={result.responseData}
+                    />
                   )}
 
                   {/* Assertion results */}

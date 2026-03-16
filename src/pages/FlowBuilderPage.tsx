@@ -134,18 +134,20 @@ function FlowBuilderContent() {
       });
     },
     onNodeCompleted: (e) => {
-      const status = e.status as 'success' | 'warning';
+      const status = e.status as 'success' | 'warning' | 'error';
       setNodeStatus(e.nodeId, status);
       setNodeResult(e.nodeId, {
         id: '', executionId: e.executionId, nodeId: e.nodeId, iteration: 0, status,
         startedAt: null, completedAt: null, retryCount: 0, createdAt: new Date().toISOString(),
         durationMs: e.durationMs ?? null,
-        requestSnapshot: null, responseData: null,
+        requestSnapshot: e.requestSnapshot ?? null,
+        responseData: e.responseData ?? null,
         extractedValues: e.extractedValues ?? null,
         schemaValidation: e.schemaValidation ?? null,
         assertionResults: e.assertionResults ?? null,
         scriptOutput: e.scriptOutput ?? null,
-        error: null,
+        error: e.error ?? null,
+        errorSource: e.errorSource ?? null,
       });
       // Clear edge animation for completed node
       const state = useFlowBuilderStore.getState();
@@ -162,9 +164,13 @@ function FlowBuilderContent() {
         setNodeResult(e.nodeId, {
           id: '', executionId: e.executionId, nodeId: e.nodeId, iteration: 0, status: 'error',
           startedAt: null, completedAt: null, retryCount: 0, createdAt: new Date().toISOString(),
-          durationMs: null, requestSnapshot: null, responseData: e.responseData ?? null, extractedValues: null,
+          durationMs: null,
+          requestSnapshot: e.requestSnapshot ?? null,
+          responseData: e.responseData ?? null,
+          extractedValues: null,
           schemaValidation: null, assertionResults: null, scriptOutput: null,
           error: e.error,
+          errorSource: e.errorSource ?? null,
         });
         // Clear edge animation for failed node
         const state = useFlowBuilderStore.getState();
@@ -195,7 +201,13 @@ function FlowBuilderContent() {
       useFlowBuilderStore.setState({
         edges: state.edges.map((edge) => ({ ...edge, data: { ...edge.data, animated: false } })),
       });
-      toast.success('Flow execution completed');
+      if (e.summary.errors > 0) {
+        toast.error(`Execution finished with ${e.summary.errors} failed node(s) — see report for details`);
+      } else if (e.summary.warnings > 0) {
+        toast.warning(`Execution completed with ${e.summary.warnings} warning(s)`);
+      } else {
+        toast.success('Flow execution completed successfully');
+      }
       fetchFullExecutionReport(e.executionId);
     },
     onExecutionFailed: (e) => {
@@ -205,7 +217,7 @@ function FlowBuilderContent() {
       useFlowBuilderStore.setState({
         edges: state.edges.map((edge) => ({ ...edge, data: { ...edge.data, animated: false } })),
       });
-      toast.error(`Execution failed: ${e.error}`);
+      toast.error(`Execution error: ${e.error}`);
       if (e.executionId) fetchFullExecutionReport(e.executionId);
     },
     onExecutionCancelled: () => {

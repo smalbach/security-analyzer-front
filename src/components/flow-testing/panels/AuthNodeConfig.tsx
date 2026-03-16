@@ -1,5 +1,9 @@
-import { ConfigField, ConfigInput, ConfigTextarea, ConfigSelect } from './ConfigField';
+import { ConfigField, ConfigInput, ConfigSelect } from './ConfigField';
 import { EndpointPicker } from './EndpointPicker';
+import { JsonEditor } from './JsonEditor';
+import { TemplateInput } from './TemplateInput';
+import { AvailableVariables } from './AvailableVariables';
+import { useTemplateCompletions } from '../../../hooks/useTemplateCompletions';
 import type { ApiEndpoint } from '../../../types/api';
 
 interface AuthNodeConfigProps {
@@ -10,6 +14,7 @@ interface AuthNodeConfigProps {
 
 export function AuthNodeConfig({ config, onChange, projectId }: AuthNodeConfigProps) {
   const update = (field: string, value: unknown) => onChange({ ...config, [field]: value });
+  const completions = useTemplateCompletions(projectId);
 
   const handleEndpointSelect = (ep: ApiEndpoint) => {
     onChange({
@@ -26,6 +31,8 @@ export function AuthNodeConfig({ config, onChange, projectId }: AuthNodeConfigPr
 
   return (
     <div className="space-y-3">
+      <AvailableVariables projectId={projectId} />
+
       <ConfigField label="Select from endpoints" help="Pick an existing login endpoint from your project. Its method, headers, and body will be auto-filled.">
         <EndpointPicker
           projectId={projectId}
@@ -35,8 +42,13 @@ export function AuthNodeConfig({ config, onChange, projectId }: AuthNodeConfigPr
         />
       </ConfigField>
 
-      <ConfigField label="Login URL" help="The full URL or path to the login endpoint. Supports {{env.key}} template variables.">
-        <ConfigInput value={String(config.loginUrl || '')} onChange={(v) => update('loginUrl', v)} placeholder="{{env.baseUrl}}/auth/login" mono />
+      <ConfigField label="Login URL" help="Enter a path like /auth/login — the base URL from your environment (baseUrl, apiUrl, etc.) is prepended automatically. Full URLs (https://...) are used as-is. Supports {{env.key}} templates and {param} path parameters. Type {{ to see available variables.">
+        <TemplateInput
+          value={String(config.loginUrl || '')}
+          onChange={(v) => update('loginUrl', v)}
+          completions={completions}
+          placeholder="/auth/login"
+        />
       </ConfigField>
 
       <ConfigField label="Method">
@@ -44,19 +56,23 @@ export function AuthNodeConfig({ config, onChange, projectId }: AuthNodeConfigPr
           options={[{ value: 'POST', label: 'POST' }, { value: 'PUT', label: 'PUT' }, { value: 'PATCH', label: 'PATCH' }]} />
       </ConfigField>
 
-      <ConfigField label="Headers (JSON)" help="HTTP headers sent with the login request. JSON format.">
-        <ConfigTextarea
+      <ConfigField label="Headers (JSON)" help="HTTP headers as JSON. Supports {{env.key}}, {{var.key}}, and {{nodeId.extractor}} templates. Type {{ inside a value to see available variables.">
+        <JsonEditor
           value={typeof config.headers === 'string' ? config.headers : JSON.stringify(config.headers || {}, null, 2)}
-          onChange={(v) => { try { update('headers', JSON.parse(v)); } catch { /* keep raw */ } }}
+          onChange={(raw) => { try { update('headers', JSON.parse(raw)); } catch { update('headers', raw); } }}
           placeholder='{"Content-Type": "application/json"}'
+          minHeight="80px"
+          templateCompletions={completions}
         />
       </ConfigField>
 
-      <ConfigField label="Body (JSON)" help="Request body for authentication. Typically contains email/username and password.">
-        <ConfigTextarea
+      <ConfigField label="Body (JSON)" help="Login request body as JSON. Use {{env.testEmail}}, {{env.testPassword}} for credentials from environment. Type {{ to see available variables.">
+        <JsonEditor
           value={typeof config.body === 'string' ? config.body : JSON.stringify(config.body || {}, null, 2)}
-          onChange={(v) => { try { update('body', JSON.parse(v)); } catch { /* keep raw */ } }}
+          onChange={(raw) => { try { update('body', JSON.parse(raw)); } catch { update('body', raw); } }}
           placeholder='{"email": "{{env.testEmail}}", "password": "{{env.testPassword}}"}'
+          minHeight="100px"
+          templateCompletions={completions}
         />
       </ConfigField>
 

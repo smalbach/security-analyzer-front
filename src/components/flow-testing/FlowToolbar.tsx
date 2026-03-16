@@ -32,7 +32,9 @@ export function FlowToolbar({
 }: FlowToolbarProps) {
   const navigate = useNavigate();
   const { projectId } = useParams<{ projectId: string }>();
-  const { fullExecutionData, showExecutionReport, setShowExecutionReport, stepDelayMs, setStepDelayMs } = useFlowBuilderStore();
+  const { fullExecutionData, executionSummary, showExecutionReport, setShowExecutionReport, stepDelayMs, setStepDelayMs } = useFlowBuilderStore();
+  const hasExecutionData = !!(fullExecutionData || executionSummary);
+  const hasErrors = executionSummary?.errors ? executionSummary.errors > 0 : false;
 
   return (
     <div className="flex items-center gap-2 border-b border-[var(--surface-border)] bg-[rgba(var(--bg-900),0.6)] px-3 py-2 backdrop-blur-xl">
@@ -95,13 +97,17 @@ export function FlowToolbar({
       {/* Right: Actions — fixed width so they don't shift */}
       <div className="flex shrink-0 items-center gap-2">
         {/* View Report button — appears when execution data is available */}
-        {fullExecutionData && !showExecutionReport && !isExecuting && (
+        {hasExecutionData && !showExecutionReport && !isExecuting && (
           <button
             type="button"
             onClick={() => setShowExecutionReport(true)}
-            className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-slate-300 transition hover:bg-white/10 hover:text-slate-100"
+            className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition ${
+              hasErrors
+                ? 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 animate-pulse'
+                : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-slate-100'
+            }`}
           >
-            📋 Report
+            {hasErrors ? 'View Error Report' : 'View Report'}
           </button>
         )}
 

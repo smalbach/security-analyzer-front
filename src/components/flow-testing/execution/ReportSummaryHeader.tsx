@@ -14,15 +14,22 @@ const CATEGORY_PILL_COLORS: Record<string, string> = {
   unknown: 'border-slate-500/20 bg-slate-500/10 text-slate-400',
 };
 
+function statusCodeColor(code: number): string {
+  if (code < 300) return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400';
+  if (code < 400) return 'border-amber-500/20 bg-amber-500/10 text-amber-400';
+  return 'border-red-500/20 bg-red-500/10 text-red-400';
+}
+
 interface ReportSummaryHeaderProps {
   summary: FlowExecutionSummary | null;
   diagnoses: ErrorDiagnosis[];
   overallStatus: 'success' | 'warning' | 'error';
   onClose: () => void;
   onShowTimeline: () => void;
+  httpStatusDistribution?: Record<number, number>;
 }
 
-export function ReportSummaryHeader({ summary, diagnoses, overallStatus, onClose, onShowTimeline }: ReportSummaryHeaderProps) {
+export function ReportSummaryHeader({ summary, diagnoses, overallStatus, onClose, onShowTimeline, httpStatusDistribution }: ReportSummaryHeaderProps) {
   const { nodeStatuses } = useFlowBuilderStore();
 
   // Group diagnoses by category
@@ -46,6 +53,11 @@ export function ReportSummaryHeader({ summary, diagnoses, overallStatus, onClose
   return (
     <div className="sticky top-0 z-10 border-b border-white/5 bg-[rgba(var(--bg-900),0.98)] px-4 py-2.5">
       <div className="flex items-center gap-3">
+        {/* Report title */}
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Execution Report</span>
+
+        <div className="h-3.5 w-px bg-white/10" />
+
         {/* Overall status badge */}
         <div className={cn(
           'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold',
@@ -112,6 +124,34 @@ export function ReportSummaryHeader({ summary, diagnoses, overallStatus, onClose
               {count} {CATEGORY_LABELS[cat]}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* HTTP status distribution */}
+      {httpStatusDistribution && Object.keys(httpStatusDistribution).length > 0 && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-slate-500 mr-1">HTTP responses:</span>
+          {Object.entries(httpStatusDistribution)
+            .sort(([a], [b]) => Number(a) - Number(b))
+            .map(([code, count]) => (
+              <span
+                key={code}
+                className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', statusCodeColor(Number(code)))}
+              >
+                {code} ×{count}
+              </span>
+            ))}
+        </div>
+      )}
+
+      {/* Assertion stats */}
+      {summary && (summary.assertionsPassed > 0 || summary.assertionsFailed > 0) && (
+        <div className="mt-1.5 flex items-center gap-2 text-[10px]">
+          <span className="text-slate-500">Assertions:</span>
+          <span className="text-emerald-400">{summary.assertionsPassed} passed</span>
+          {summary.assertionsFailed > 0 && (
+            <span className="text-red-400">{summary.assertionsFailed} failed</span>
+          )}
         </div>
       )}
     </div>
