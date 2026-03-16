@@ -1,5 +1,6 @@
 import { cn } from '../../../lib/cn';
 import { HelpTooltip } from '../../ui/HelpTooltip';
+import { CustomSelect } from '../../ui/CustomSelect';
 
 interface ConfigFieldProps {
   label: string;
@@ -74,14 +75,11 @@ interface ConfigSelectProps {
 
 export function ConfigSelect({ value, onChange, options, className }: ConfigSelectProps) {
   return (
-    <select
+    <CustomSelect
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={cn(INPUT_CLASS, className)}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
+      onChange={onChange}
+      options={options}
+      className={className}
+    />
   );
 }

@@ -2,6 +2,7 @@ export * from './Accordion';
 export * from './Badge';
 export * from './Button';
 export * from './Card';
+export * from './CustomSelect';
 export * from './ConfirmModal';
 export * from './DataTable';
 export * from './EmptyState';

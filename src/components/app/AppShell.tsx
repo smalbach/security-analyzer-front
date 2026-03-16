@@ -6,7 +6,7 @@ import { ActiveProjectProvider } from '../../contexts/ActiveProjectContext';
 import { AppBackground } from './AppBackground';
 import { AppRoutes } from './AppRoutes';
 import { HelpPanel } from '../HelpPanel';
-import { FloatingEnvButton } from './FloatingEnvButton';
+
 
 export function AppShell() {
   const { isRedirectingToLogin } = useAuth();
@@ -17,7 +17,6 @@ export function AppShell() {
         <div className="relative min-h-screen overflow-hidden bg-slatewave-950 text-slate-100">
           <AppBackground />
           <NavHeader />
-          <FloatingEnvButton />
 
           <main className="app-main-shell relative mx-auto flex flex-col gap-6 px-4 py-8 md:px-8 md:py-12">
             {isRedirectingToLogin ? (

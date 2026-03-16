@@ -3,8 +3,9 @@
  * Extracted values become available to downstream nodes via {{nodeId.extractorName}}.
  */
 
+import { CustomSelect } from '../../ui/CustomSelect';
+
 const INPUT_CLASS = 'w-full rounded border border-white/10 bg-white/5 px-1 py-0.5 text-[10px] text-slate-300 outline-none placeholder:text-slate-500';
-const SELECT_CLASS = 'w-full rounded border border-white/10 bg-white/5 px-1 py-0.5 text-[10px] text-slate-300 outline-none';
 
 const EXTRACTOR_TYPES = [
   { value: 'jsonpath', label: 'JSONPath' },
@@ -54,9 +55,11 @@ export function ExtractorList({ config, onChange }: ExtractorListProps) {
           </div>
 
           {/* Type */}
-          <select value={String(ex.type || 'jsonpath')} onChange={(e) => update(i, 'type', e.target.value)} className={SELECT_CLASS}>
-            {EXTRACTOR_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+          <CustomSelect
+            value={String(ex.type || 'jsonpath')}
+            onChange={(v) => update(i, 'type', v)}
+            options={[...EXTRACTOR_TYPES]}
+          />
 
           {/* Expression */}
           <input

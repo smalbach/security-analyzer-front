@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useActiveProject } from '../../contexts/ActiveProjectContext';
 import { toast } from '../../lib/toast';
@@ -51,6 +52,8 @@ export function FloatingEnvButton() {
   const [environments, setEnvironments] = useState<ProjectEnvironment[]>([]);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
 
   const activeEnv = useEnvironmentStore((s) => (activeProject ? s.getActiveEnv(activeProject.id) : null));
   const setActiveEnvInStore = useEnvironmentStore((s) => s.setActiveEnv);
@@ -98,12 +101,25 @@ export function FloatingEnvButton() {
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insideDropdown = dropdownRef.current?.contains(target);
+      const insideButton = buttonRef.current?.contains(target);
+      if (!insideDropdown && !insideButton) {
         setOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // Update dropdown position when open
+  useEffect(() => {
+    if (!open || !buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    setDropdownPos({
+      top: rect.bottom + 8,
+      right: window.innerWidth - rect.right,
+    });
   }, [open]);
 
   if (!isAuthenticated || !activeProject) return null;
@@ -123,23 +139,27 @@ export function FloatingEnvButton() {
 
   return (
     <>
-      <div ref={dropdownRef} className="fixed right-4 top-16 z-50">
-        <button
-          type="button"
-          onClick={() => setOpen((p) => !p)}
-          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 shadow-glass backdrop-blur-xl transition-all hover:border-white/20 hover:bg-white/10"
-        >
-          <span className={`h-2 w-2 rounded-full ${activeEnv ? 'bg-emerald-400' : 'bg-slate-500'}`} />
-          {activeEnv?.name ?? 'No Environment'}
-          {sessionToken && (
-            <span className="ml-1 rounded bg-tide-500/20 px-1.5 py-0.5 text-[10px] text-tide-300">
-              Token
-            </span>
-          )}
-        </button>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 shadow-glass backdrop-blur-xl transition-all hover:border-white/20 hover:bg-white/10"
+      >
+        <span className={`h-2 w-2 rounded-full ${activeEnv ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+        {activeEnv?.name ?? 'No Environment'}
+        {sessionToken && (
+          <span className="ml-1 rounded bg-tide-500/20 px-1.5 py-0.5 text-[10px] text-tide-300">
+            Token
+          </span>
+        )}
+      </button>
 
-        {open && (
-          <div className="absolute right-0 top-full mt-2 w-96 rounded-2xl border border-white/10 bg-slatewave-950/95 shadow-glass backdrop-blur-xl">
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-[9999] w-96 rounded-2xl border border-white/10 bg-slatewave-950/95 shadow-glass backdrop-blur-xl"
+          style={{ top: dropdownPos.top, right: dropdownPos.right }}
+        >
             {/* Environments section */}
             <div className="border-b border-white/10 p-3">
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
@@ -274,9 +294,9 @@ pm.environment.set("token", data.access_token);`}</pre>
                 </div>
               )}
             </div>
-          </div>
-        )}
-      </div>
+        </div>,
+        document.body,
+      )}
 
       {managerOpen && (
         <EnvironmentManager

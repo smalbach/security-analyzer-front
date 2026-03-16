@@ -1,4 +1,4 @@
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useOptionalProjectContext } from '../../contexts/ProjectContext';
 import {
   ArrowLeftIcon,
@@ -61,17 +61,28 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-function getActiveTab(value: string | null): Tab {
+function getActiveTab(tabParam: string | null, pathname: string): Tab {
+  // First check the explicit tab query parameter
   if (
-    value === 'roles' ||
-    value === 'test-runs' ||
-    value === 'performance' ||
-    value === 'flow-testing' ||
-    value === 'settings'
+    tabParam === 'roles' ||
+    tabParam === 'test-runs' ||
+    tabParam === 'performance' ||
+    tabParam === 'flow-testing' ||
+    tabParam === 'settings'
   ) {
-    return value;
+    return tabParam;
   }
-  return 'endpoints';
+
+  // Derive from pathname for sub-routes (e.g. /projects/:id/flows/:flowId)
+  if (pathname.includes('/flows/') || pathname.includes('/flows')) return 'flow-testing';
+  if (pathname.includes('/test-runs/')) return 'test-runs';
+  if (pathname.includes('/perf-executions')) return 'performance';
+  if (pathname.includes('/endpoints/')) return 'endpoints';
+  if (pathname.includes('/settings')) return 'settings';
+  if (pathname.includes('/roles')) return 'roles';
+
+  // Default when on the base project page
+  return tabParam === 'endpoints' || tabParam === null ? 'endpoints' : 'endpoints';
 }
 
 export function ProjectSidebar() {
@@ -84,7 +95,8 @@ export function ProjectSidebar() {
   if (!ctx?.project) return null;
 
   const { project } = ctx;
-  const activeTab = getActiveTab(searchParams.get('tab'));
+  const location = useLocation();
+  const activeTab = getActiveTab(searchParams.get('tab'), location.pathname);
 
   function setTab(tab: Tab) {
     navigate(`/projects/${projectId}?tab=${tab}`);

@@ -4,6 +4,7 @@ import { useFlowBuilderStore } from '../../../stores/flowBuilderStore';
 
 interface AvailableVariablesProps {
   projectId: string;
+  variableMappings?: Array<Record<string, unknown>>;
 }
 
 const TYPE_COLORS: Record<string, { badge: string; text: string }> = {
@@ -27,13 +28,26 @@ const SECTION_LABELS: Record<string, string> = {
 /**
  * Collapsible panel showing all available template variables for the currently
  * selected node. Grouped by type (env, node extractors, flow vars) with
- * copy-to-clipboard for each variable.
+ * copy-to-clipboard for each variable. Shows "USED" badges for variables
+ * consumed by variable mappings.
  */
-export function AvailableVariables({ projectId }: AvailableVariablesProps) {
+export function AvailableVariables({ projectId, variableMappings }: AvailableVariablesProps) {
   const completions = useTemplateCompletions(projectId);
   const [collapsed, setCollapsed] = useState(true);
   const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
   const nodes = useFlowBuilderStore((s) => s.nodes);
+
+  // Build a map of used variables: sourceExpression → targetPath
+  const usageMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!variableMappings) return map;
+    for (const m of variableMappings) {
+      const expr = String(m.sourceExpression || '');
+      const target = String(m.targetPath || '');
+      if (expr) map.set(expr, target);
+    }
+    return map;
+  }, [variableMappings]);
 
   const grouped = useMemo(() => {
     const envVars = completions.filter((c) => c.type === 'env');
@@ -56,6 +70,7 @@ export function AvailableVariables({ projectId }: AvailableVariablesProps) {
   }, [completions, nodes]);
 
   const totalCount = completions.length;
+  const usedCount = usageMap.size;
 
   const copyToClipboard = (label: string) => {
     navigator.clipboard.writeText(label).then(() => {
@@ -82,6 +97,11 @@ export function AvailableVariables({ projectId }: AvailableVariablesProps) {
         <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
           Available Variables
         </span>
+        {usedCount > 0 && (
+          <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-medium text-emerald-400">
+            {usedCount} used
+          </span>
+        )}
         <span className="ml-auto rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-slate-600">
           {totalCount}
         </span>
@@ -103,6 +123,7 @@ export function AvailableVariables({ projectId }: AvailableVariablesProps) {
                   completion={c}
                   copied={copiedLabel === c.label}
                   onCopy={copyToClipboard}
+                  usageTarget={usageMap.get(c.label)}
                 />
               ))}
             </VariableSection>
@@ -123,6 +144,7 @@ export function AvailableVariables({ projectId }: AvailableVariablesProps) {
                       completion={c}
                       copied={copiedLabel === c.label}
                       onCopy={copyToClipboard}
+                      usageTarget={usageMap.get(c.label)}
                     />
                   ))}
                 </div>
@@ -139,6 +161,7 @@ export function AvailableVariables({ projectId }: AvailableVariablesProps) {
                   completion={c}
                   copied={copiedLabel === c.label}
                   onCopy={copyToClipboard}
+                  usageTarget={usageMap.get(c.label)}
                 />
               ))}
             </VariableSection>
@@ -171,10 +194,12 @@ function VariableRow({
   completion,
   copied,
   onCopy,
+  usageTarget,
 }: {
   completion: TemplateCompletion;
   copied: boolean;
   onCopy: (label: string) => void;
+  usageTarget?: string;
 }) {
   // Extract short name from displayLabel (e.g. "env.baseUrl" → "baseUrl", "Auth Login.__token" → "__token")
   const shortName = completion.displayLabel.includes('.')
@@ -186,11 +211,23 @@ function VariableRow({
     ? completion.detail.split(' \u00B7 ').pop() || ''
     : completion.detail;
 
+  const isUsed = usageTarget !== undefined;
+
   return (
     <div className="group flex items-center gap-1.5 px-2 py-1 transition hover:bg-white/5">
       <span className="min-w-0 shrink-0 font-mono text-[10px] font-medium text-slate-300">
         {shortName}
       </span>
+      {isUsed && (
+        <span className="shrink-0 flex items-center gap-0.5 rounded bg-emerald-500/15 px-1 py-0.5 text-[8px] font-bold text-emerald-400" title={`Mapped to: ${usageTarget}`}>
+          USED
+          {usageTarget && (
+            <span className="font-normal text-emerald-400/70">
+              → {usageTarget}
+            </span>
+          )}
+        </span>
+      )}
       <span className="min-w-0 flex-1 truncate text-[9px] text-slate-600" title={detailValue}>
         {detailValue}
       </span>

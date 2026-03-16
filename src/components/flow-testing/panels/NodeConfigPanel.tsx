@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '../../../lib/cn';
 import { useFlowBuilderStore } from '../../../stores/flowBuilderStore';
 import { HelpTooltip } from '../../ui/HelpTooltip';
@@ -20,6 +21,11 @@ interface NodeConfigPanelProps {
 
 const TABS = ['config', 'scripts', 'assertions', 'extractors'] as const;
 type Tab = (typeof TABS)[number];
+
+const MIN_WIDTH = 280;
+const MAX_WIDTH = 700;
+const STORAGE_KEY = 'asa-config-panel-width';
+const DEFAULT_WIDTH = 320;
 
 /** Maps node type → which optional tabs to show */
 function getVisibleTabs(nodeType: string): Set<Tab> {
@@ -54,14 +60,70 @@ function NodeTypeConfig({
   }
 }
 
+function useResizableWidth() {
+  const [width, setWidth] = useState(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    const parsed = stored ? Number(stored) : NaN;
+    return Number.isFinite(parsed) && parsed >= MIN_WIDTH && parsed <= MAX_WIDTH ? parsed : DEFAULT_WIDTH;
+  });
+
+  const isResizing = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    startX.current = e.clientX;
+    startWidth.current = width;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [width]);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isResizing.current) return;
+      // Panel is on the right, so dragging left (decreasing clientX) increases width
+      const delta = startX.current - e.clientX;
+      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth.current + delta));
+      setWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      if (!isResizing.current) return;
+      isResizing.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      // Persist on release
+      setWidth((w) => {
+        localStorage.setItem(STORAGE_KEY, String(w));
+        return w;
+      });
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  return { width, onMouseDown };
+}
+
 export function NodeConfigPanel({ projectId }: NodeConfigPanelProps) {
   const { selectedNodeId, nodes, updateNodeConfig, updateNodeData, configPanelTab, setConfigPanelTab } =
     useFlowBuilderStore();
+  const { width: panelWidth, onMouseDown: startResize } = useResizableWidth();
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
   if (!selectedNode) {
     return (
-      <div className="flex w-[320px] items-center justify-center border-l border-[var(--surface-border)] bg-[rgba(var(--bg-900),0.4)] text-xs text-slate-500">
+      <div
+        className="flex items-center justify-center border-l border-[var(--surface-border)] bg-[rgba(var(--bg-900),0.4)] text-xs text-slate-500"
+        style={{ width: panelWidth }}
+      >
         Select a node to configure
       </div>
     );
@@ -76,7 +138,16 @@ export function NodeConfigPanel({ projectId }: NodeConfigPanelProps) {
   const handleOnErrorChange = (onError: string) => updateNodeData(selectedNode.id, { onError: onError as 'stop' | 'continue' | 'error_branch' });
 
   return (
-    <div className="flex w-[320px] flex-col overflow-hidden border-l border-[var(--surface-border)] bg-[rgba(var(--bg-900),0.5)] backdrop-blur-xl">
+    <div
+      className="relative flex flex-col overflow-hidden border-l border-[var(--surface-border)] bg-[rgba(var(--bg-900),0.5)] backdrop-blur-xl"
+      style={{ width: panelWidth }}
+    >
+      {/* Resize handle */}
+      <div
+        className="absolute left-0 top-0 bottom-0 z-10 w-1 cursor-col-resize transition-colors hover:bg-[rgba(var(--accent-400),0.3)]"
+        onMouseDown={startResize}
+      />
+
       {/* Header */}
       <div className="border-b border-white/5 px-3 py-2">
         <input

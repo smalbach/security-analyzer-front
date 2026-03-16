@@ -3,7 +3,7 @@
  * (status, header, jsonpath, body, response time, regex).
  */
 
-const SELECT_CLASS = 'rounded border border-white/10 bg-white/5 px-1 py-0.5 text-[10px] text-slate-300 outline-none';
+import { CustomSelect } from '../../ui/CustomSelect';
 const INPUT_CLASS = 'w-full rounded border border-white/10 bg-white/5 px-1 py-0.5 text-[10px] text-slate-300 outline-none placeholder:text-slate-500';
 
 const ASSERTION_TYPES = [
@@ -76,12 +76,16 @@ export function AssertionList({ config, onChange }: AssertionListProps) {
 
           {/* Type + Operator */}
           <div className="grid grid-cols-2 gap-1">
-            <select value={String(a.type || 'status')} onChange={(e) => update(i, 'type', e.target.value)} className={SELECT_CLASS}>
-              {ASSERTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-            <select value={String(a.operator || 'equals')} onChange={(e) => update(i, 'operator', e.target.value)} className={SELECT_CLASS}>
-              {OPERATORS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            <CustomSelect
+              value={String(a.type || 'status')}
+              onChange={(v) => update(i, 'type', v)}
+              options={[...ASSERTION_TYPES]}
+            />
+            <CustomSelect
+              value={String(a.operator || 'equals')}
+              onChange={(v) => update(i, 'operator', v)}
+              options={[...OPERATORS]}
+            />
           </div>
 
           {/* Target */}

@@ -1,15 +1,41 @@
+import { useState, useEffect } from 'react';
 import { ConfigField, ConfigSelect } from './ConfigField';
 import { EndpointPicker } from './EndpointPicker';
 import { JsonEditor } from './JsonEditor';
+import { SchemaBuilder } from './SchemaBuilder';
 import { TemplateInput } from './TemplateInput';
 import { AvailableVariables } from './AvailableVariables';
 import { useTemplateCompletions } from '../../../hooks/useTemplateCompletions';
+import { KeyValueTable } from '../../endpoint-editor/KeyValueTable';
+import { VariableMappingEditor } from './VariableMappingEditor';
+import type { KVPair } from '../../endpoint-editor/types';
 import type { ApiEndpoint } from '../../../types/api';
 
 interface RequestNodeConfigProps {
   config: Record<string, unknown>;
   onChange: (config: Record<string, unknown>) => void;
   projectId: string;
+}
+
+/** Convert Record<string, string> → KVPair[] */
+function recordToKVPairs(record: unknown): KVPair[] {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return [];
+  return Object.entries(record as Record<string, string>).map(([key, value]) => ({
+    key,
+    value: String(value ?? ''),
+    enabled: true,
+  }));
+}
+
+/** Convert KVPair[] → Record<string, string>, filtering disabled */
+function kvPairsToRecord(pairs: KVPair[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const pair of pairs) {
+    if (pair.enabled && pair.key.trim()) {
+      result[pair.key] = pair.value;
+    }
+  }
+  return result;
 }
 
 export function RequestNodeConfig({ config, onChange, projectId }: RequestNodeConfigProps) {
@@ -34,22 +60,46 @@ export function RequestNodeConfig({ config, onChange, projectId }: RequestNodeCo
 
   const mappings = (config.variableMappings || []) as Array<Record<string, unknown>>;
 
-  const addMapping = () => {
-    onChange({ ...config, variableMappings: [...mappings, { targetPath: '', sourceNodeId: '', sourceExpression: '' }] });
+  // Local state for KVPair rows — preserves empty rows while editing
+  const [localHeaderRows, setLocalHeaderRows] = useState<KVPair[]>(() => recordToKVPairs(config.headers));
+  const [localQueryRows, setLocalQueryRows] = useState<KVPair[]>(() => recordToKVPairs(config.queryParams));
+
+  // Sync from external config changes (e.g. endpoint picker selecting a new endpoint)
+  useEffect(() => {
+    const configRecord = (config.headers && typeof config.headers === 'object' && !Array.isArray(config.headers))
+      ? config.headers as Record<string, string>
+      : {};
+    const localRecord = kvPairsToRecord(localHeaderRows);
+    if (JSON.stringify(localRecord) !== JSON.stringify(configRecord)) {
+      setLocalHeaderRows(recordToKVPairs(config.headers));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.headers]);
+
+  useEffect(() => {
+    const configRecord = (config.queryParams && typeof config.queryParams === 'object' && !Array.isArray(config.queryParams))
+      ? config.queryParams as Record<string, string>
+      : {};
+    const localRecord = kvPairsToRecord(localQueryRows);
+    if (JSON.stringify(localRecord) !== JSON.stringify(configRecord)) {
+      setLocalQueryRows(recordToKVPairs(config.queryParams));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.queryParams]);
+
+  const handleHeaderChange = (rows: KVPair[]) => {
+    setLocalHeaderRows(rows);
+    update('headers', kvPairsToRecord(rows));
   };
 
-  const updateMapping = (index: number, field: string, value: string) => {
-    const updated = mappings.map((m, i) => (i === index ? { ...m, [field]: value } : m));
-    onChange({ ...config, variableMappings: updated });
-  };
-
-  const removeMapping = (index: number) => {
-    onChange({ ...config, variableMappings: mappings.filter((_, i) => i !== index) });
+  const handleQueryChange = (rows: KVPair[]) => {
+    setLocalQueryRows(rows);
+    update('queryParams', kvPairsToRecord(rows));
   };
 
   return (
     <div className="space-y-3">
-      <AvailableVariables projectId={projectId} />
+      <AvailableVariables projectId={projectId} variableMappings={mappings} />
 
       <ConfigField label="Select from endpoints" help="Pick an existing endpoint from your project. Its method, URL, headers, query params, and body will be auto-filled.">
         <EndpointPicker
@@ -74,23 +124,21 @@ export function RequestNodeConfig({ config, onChange, projectId }: RequestNodeCo
           options={['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map((m) => ({ value: m, label: m }))} />
       </ConfigField>
 
-      <ConfigField label="Headers (JSON)" help={'HTTP headers as JSON. Values support {{env.key}}, {{var.key}}, and {{nodeId.extractor}} templates. Remember to quote values: "Bearer {{token}}". Type {{ to see available variables.'}>
-        <JsonEditor
-          value={typeof config.headers === 'string' ? config.headers : JSON.stringify(config.headers || {}, null, 2)}
-          onChange={(raw) => { try { update('headers', JSON.parse(raw)); } catch { update('headers', raw); } }}
-          placeholder='{"Content-Type": "application/json"}'
-          minHeight="80px"
+      <ConfigField label="Headers" help={'Add HTTP headers as key-value pairs. Values support {{env.key}}, {{var.key}}, and {{nodeId.extractor}} templates. Type {{ to see available variables.'}>
+        <KeyValueTable
+          rows={localHeaderRows}
+          onChange={handleHeaderChange}
           templateCompletions={completions}
+          compact
         />
       </ConfigField>
 
-      <ConfigField label="Query Params (JSON)" help="URL query params as JSON. Supports {{env.key}}, {{var.key}}, and {{nodeId.extractor}} templates. Type {{ to see available variables.">
-        <JsonEditor
-          value={typeof config.queryParams === 'string' ? config.queryParams : JSON.stringify(config.queryParams || {}, null, 2)}
-          onChange={(raw) => { try { update('queryParams', JSON.parse(raw)); } catch { update('queryParams', raw); } }}
-          placeholder='{"page": "1", "limit": "10"}'
-          minHeight="60px"
+      <ConfigField label="Query Params" help="URL query params as key-value pairs. Supports {{env.key}}, {{var.key}}, and {{nodeId.extractor}} templates. Type {{ to see available variables.">
+        <KeyValueTable
+          rows={localQueryRows}
+          onChange={handleQueryChange}
           templateCompletions={completions}
+          compact
         />
       </ConfigField>
 
@@ -104,36 +152,20 @@ export function RequestNodeConfig({ config, onChange, projectId }: RequestNodeCo
         />
       </ConfigField>
 
-      <ConfigField label="Response Schema (JSON Schema)" help="Paste a JSON Schema to validate the response structure. Errors = missing/wrong types, Warnings = extra fields (contract drift).">
-        <JsonEditor
-          value={typeof config.responseSchema === 'string' ? config.responseSchema : JSON.stringify(config.responseSchema || null, null, 2)}
-          onChange={(raw) => { try { update('responseSchema', JSON.parse(raw)); } catch { update('responseSchema', raw); } }}
-          placeholder="Paste JSON Schema to validate response"
-          minHeight="120px"
+      <ConfigField label="Response Schema" help="Define a JSON Schema to validate the response structure. Use the visual editor to add fields or switch to raw JSON. Errors = missing/wrong types, Warnings = extra fields (contract drift).">
+        <SchemaBuilder
+          value={typeof config.responseSchema === 'string' ? (() => { try { return JSON.parse(config.responseSchema); } catch { return null; } })() : config.responseSchema}
+          onChange={(schema) => update('responseSchema', schema)}
         />
       </ConfigField>
 
       {/* Variable mappings */}
-      <ConfigField label="Variable Mappings" help="Map values from upstream nodes into this request. Source uses {{nodeId.extractorName}} template syntax.">
-        <div className="space-y-1.5">
-          {mappings.map((m, i) => (
-            <div key={i} className="space-y-1 rounded-lg border border-white/10 bg-white/[0.02] p-1.5">
-              <div className="flex gap-1">
-                <input type="text" value={String(m.sourceNodeId || '')} onChange={(e) => updateMapping(i, 'sourceNodeId', e.target.value)}
-                  placeholder="Source node ID" className="flex-1 rounded border border-white/10 bg-white/5 px-1 py-0.5 text-[10px] text-slate-300 outline-none placeholder:text-slate-500" />
-                <button type="button" onClick={() => removeMapping(i)} className="text-xs text-red-400">&times;</button>
-              </div>
-              <input type="text" value={String(m.sourceExpression || '')} onChange={(e) => updateMapping(i, 'sourceExpression', e.target.value)}
-                placeholder="Source: {{nodeId.extractorName}}" className="w-full rounded border border-white/10 bg-white/5 px-1 py-0.5 font-mono text-[10px] text-slate-300 outline-none placeholder:text-slate-500" />
-              <input type="text" value={String(m.targetPath || '')} onChange={(e) => updateMapping(i, 'targetPath', e.target.value)}
-                placeholder="Target path in request" className="w-full rounded border border-white/10 bg-white/5 px-1 py-0.5 text-[10px] text-slate-300 outline-none placeholder:text-slate-500" />
-            </div>
-          ))}
-          <button type="button" onClick={addMapping}
-            className="w-full rounded-lg border border-white/10 bg-white/5 py-1 text-[10px] text-slate-400 transition hover:bg-white/10">
-            + Add Mapping
-          </button>
-        </div>
+      <ConfigField label="Variable Mappings" help="Map values from upstream nodes into this request. Select a source node and its extractor, then specify where the value should go in this request.">
+        <VariableMappingEditor
+          mappings={mappings}
+          onChange={(updated) => onChange({ ...config, variableMappings: updated })}
+          projectId={projectId}
+        />
       </ConfigField>
     </div>
   );

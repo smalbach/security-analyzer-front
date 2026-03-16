@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { ThemePicker } from './app/ThemePicker';
+import { FloatingEnvButton } from './app/FloatingEnvButton';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { getThemeOption } from '../contexts/themeOptions';
@@ -70,6 +71,7 @@ export function NavHeader() {
         <div className="flex flex-wrap items-center justify-end gap-2">
           {isAuthenticated ? (
             <div className="app-nav-cluster flex flex-wrap items-center gap-2">
+              <FloatingEnvButton />
               <span className="app-user-chip">{user?.name}</span>
               <button type="button" onClick={() => void logout()} className="app-nav-link">
                 Logout
