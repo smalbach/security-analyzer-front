@@ -260,7 +260,7 @@ function TimingBreakdown({ execution }: { execution: FlowNodeExecution }) {
   );
 }
 
-function NodeConfigSummary({ nodeType, config }: { nodeType: string; config: Record<string, unknown> }) {
+function NodeConfigSummary({ nodeType, config, iterations }: { nodeType: string; config: Record<string, unknown>; iterations?: Array<{ index: number; total: number; item: unknown }> }) {
   if (nodeType === 'auth') {
     return (
       <div className="space-y-1">
@@ -345,13 +345,51 @@ function NodeConfigSummary({ nodeType, config }: { nodeType: string; config: Rec
 
   if (nodeType === 'loop') {
     return (
-      <div className="space-y-1">
+      <div className="space-y-2">
         <div className="text-[10px] font-semibold uppercase text-slate-500">Node Configuration</div>
         <div className="rounded-lg border border-white/5 bg-black/20 p-2 space-y-1 text-[11px]">
           <div><span className="text-slate-500">Source: </span><span className="font-mono text-slate-300">{String(config.sourceExpression || '(not set)')}</span></div>
           <div><span className="text-slate-500">Item variable: </span><span className="font-mono text-emerald-400">{String(config.itemVariable || 'item')}</span></div>
           {config.maxIterations ? <div><span className="text-slate-500">Max iterations: </span><span className="font-mono text-slate-300">{String(config.maxIterations)}</span></div> : null}
         </div>
+
+        {/* Loop iterations detail */}
+        {iterations && iterations.length > 0 && (
+          <div>
+            <div className="text-[10px] font-semibold uppercase text-slate-500 mb-1">
+              Loop Iterations ({iterations.length} of {iterations[0]?.total})
+            </div>
+            <div className="space-y-1">
+              {iterations.map((iter) => {
+                let parsedItem: unknown;
+                try {
+                  parsedItem = typeof iter.item === 'string' ? JSON.parse(iter.item) : iter.item;
+                } catch {
+                  parsedItem = iter.item;
+                }
+                return (
+                  <details
+                    key={iter.index}
+                    className="rounded-lg border border-violet-500/15 bg-violet-500/[0.04] overflow-hidden"
+                  >
+                    <summary className="flex items-center gap-2 px-2.5 py-1.5 text-[11px] cursor-pointer hover:bg-violet-500/[0.08] transition select-none">
+                      <span className="rounded bg-violet-500/20 px-1.5 py-0.5 text-[9px] font-bold text-violet-400">
+                        #{iter.index + 1}
+                      </span>
+                      <span className="font-mono text-slate-400 truncate flex-1">
+                        {JSON.stringify(parsedItem).slice(0, 120)}
+                        {JSON.stringify(parsedItem).length > 120 ? '...' : ''}
+                      </span>
+                    </summary>
+                    <pre className="px-2.5 pb-2 pt-1 text-[10px] text-slate-400 overflow-auto max-h-40 font-mono leading-relaxed">
+                      {JSON.stringify(parsedItem, null, 2)}
+                    </pre>
+                  </details>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -372,6 +410,7 @@ interface ReportNodeCardProps {
   onToggle: () => void;
   onFixThis: (tab?: string) => void;
   executionOrder?: number;
+  loopIterations?: Array<{ index: number; total: number; item: unknown }>;
 }
 
 export function ReportNodeCard({
@@ -385,6 +424,7 @@ export function ReportNodeCard({
   onToggle,
   onFixThis,
   executionOrder,
+  loopIterations,
 }: ReportNodeCardProps) {
   const purpose = describeNodePurpose(nodeType as any, nodeConfig);
 
@@ -489,7 +529,7 @@ export function ReportNodeCard({
           </div>
 
           {/* Node configuration */}
-          <NodeConfigSummary nodeType={nodeType} config={nodeConfig} />
+          <NodeConfigSummary nodeType={nodeType} config={nodeConfig} iterations={loopIterations} />
 
           {/* Error diagnosis */}
           {diagnosis && (

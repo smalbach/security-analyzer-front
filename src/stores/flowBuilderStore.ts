@@ -33,6 +33,9 @@ interface FlowBuilderState {
   isExecuting: boolean;
   executionSummary: FlowExecutionSummary | null;
 
+  // Loop iteration tracking
+  loopIterations: Record<string, Array<{ index: number; total: number; item: unknown }>>;
+
   // UI
   isDirty: boolean;
   configPanelTab: 'config' | 'scripts' | 'assertions' | 'extractors';
@@ -75,6 +78,8 @@ interface FlowBuilderState {
   setShowExecutionReport: (show: boolean) => void;
   setFullExecutionData: (data: FlowExecution | null) => void;
   setStepDelayMs: (ms: number) => void;
+  addLoopIteration: (loopNodeId: string, data: { index: number; total: number; item: unknown }) => void;
+  clearLoopIterations: () => void;
   resetExecution: () => void;
 
   // Actions - Load
@@ -141,6 +146,7 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
   nodeRetries: {},
   isExecuting: false,
   executionSummary: null,
+  loopIterations: {},
   isDirty: false,
   configPanelTab: 'config',
   showExecutionTimeline: false,
@@ -279,6 +285,16 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
   setFullExecutionData: (data) => set({ fullExecutionData: data }),
   setStepDelayMs: (ms) => set({ stepDelayMs: ms }),
 
+  addLoopIteration: (loopNodeId, data) =>
+    set((state) => ({
+      loopIterations: {
+        ...state.loopIterations,
+        [loopNodeId]: [...(state.loopIterations[loopNodeId] || []), data],
+      },
+    })),
+
+  clearLoopIterations: () => set({ loopIterations: {} }),
+
   resetExecution: () => {
     set((state) => ({
       executionId: null,
@@ -286,6 +302,7 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
       nodeStatuses: {},
       nodeResults: {},
       nodeRetries: {},
+      loopIterations: {},
       isExecuting: false,
       executionSummary: null,
       showExecutionReport: false,
@@ -325,6 +342,7 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
       nodeStatuses: {},
       nodeResults: {},
       nodeRetries: {},
+      loopIterations: {},
       isExecuting: false,
       executionSummary: null,
       globalVariables: globalVariables ?? null,
@@ -344,6 +362,7 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
       nodeStatuses: {},
       nodeResults: {},
       nodeRetries: {},
+      loopIterations: {},
       isExecuting: false,
       executionSummary: null,
       isDirty: false,

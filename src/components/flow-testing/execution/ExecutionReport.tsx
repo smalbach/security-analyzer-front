@@ -13,6 +13,7 @@ export function ExecutionReport() {
     nodes,
     nodeStatuses,
     nodeResults,
+    loopIterations,
     selectNode,
     setConfigPanelTab,
     setShowExecutionReport,
@@ -271,6 +272,7 @@ export function ExecutionReport() {
                 onToggle={() => toggleExpand(rn.id)}
                 onFixThis={(tab) => handleFixThis(rn.id, tab)}
                 executionOrder={index + 1}
+                loopIterations={rn.nodeType === 'loop' ? loopIterations[rn.id] : undefined}
               />
             );
           })

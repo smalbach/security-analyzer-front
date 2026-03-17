@@ -34,11 +34,11 @@ interface GroupedDataSourceSelectProps {
   emptyMessage?: string;
 }
 
-/** Parse a template expression to extract nodeId and field name */
-function parseTemplate(template: string): { nodeId: string; field: string } | null {
+/** Parse a template expression to extract nodeRef (label or id) and field name */
+function parseTemplate(template: string): { nodeRef: string; field: string } | null {
   const match = template.match(/^\{\{([^.]+)\.(.+)\}\}$/);
   if (!match) return null;
-  return { nodeId: match[1], field: match[2] };
+  return { nodeRef: match[1], field: match[2] };
 }
 
 export function GroupedDataSourceSelect({
@@ -97,11 +97,14 @@ export function GroupedDataSourceSelect({
       .filter((ds) => ds.fields.length > 0);
   }, [dataSources, filterFieldType, search]);
 
-  // Resolve the current value to a display label
+  // Resolve the current value to a display label (supports both label-based and UUID-based expressions)
   const displayLabel = useMemo(() => {
     const parsed = parseTemplate(value);
     if (!parsed) return null;
-    const source = dataSources.find((ds) => ds.nodeId === parsed.nodeId);
+    // Match by nodeId (UUID) or by nodeLabel (alias)
+    const source = dataSources.find(
+      (ds) => ds.nodeId === parsed.nodeRef || ds.nodeLabel.toLowerCase() === parsed.nodeRef.toLowerCase(),
+    );
     if (!source) return null;
     const field = source.fields.find((f) => f.name === parsed.field);
     if (!field) return null;

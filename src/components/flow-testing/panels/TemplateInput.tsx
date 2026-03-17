@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TemplateCompletion } from '../../../hooks/useTemplateCompletions';
 import { useFlowBuilderStore } from '../../../stores/flowBuilderStore';
+import { useNodeAliasMap } from '../../../hooks/useNodeAliasMap';
 import type { FlowNodeExtractor } from '../../../types/flow';
 
 interface TemplateInputProps {
@@ -35,7 +36,8 @@ const TYPE_LABELS: Record<string, string> = {
  * when the user types `{{`. Supports environment variables, upstream
  * node extractors, and flow global variables.
  *
- * Based on the VariableAutocomplete pattern from endpoint-editor.
+ * Auto-migrates UUID-based template expressions to label-based aliases
+ * for better readability (e.g. {{campaign.live}} instead of {{f8e79c71-...live}}).
  */
 export function TemplateInput({
   value,
@@ -50,6 +52,19 @@ export function TemplateInput({
   const [cursorPos, setCursorPos] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { replaceUuidsWithLabels, hasUuidExpressions } = useNodeAliasMap();
+
+  // Auto-migrate: if value contains UUID-based expressions, convert to label-based
+  const migratedRef = useRef<string>('');
+  useEffect(() => {
+    if (value && hasUuidExpressions(value) && migratedRef.current !== value) {
+      const migrated = replaceUuidsWithLabels(value);
+      if (migrated !== value) {
+        migratedRef.current = migrated;
+        onChange(migrated);
+      }
+    }
+  }, [value, hasUuidExpressions, replaceUuidsWithLabels, onChange]);
 
   const filtered = filter
     ? completions.filter((c) =>
@@ -113,7 +128,7 @@ export function TemplateInput({
 
       const before = value.slice(0, openPos);
       const after = value.slice(cursorPos);
-      const insertion = completion.label; // e.g. "{{env.baseUrl}}"
+      const insertion = completion.label; // e.g. "{{campaign.live}}" (label-based)
       const newValue = before + insertion + after;
       onChange(newValue);
       setShowDropdown(false);

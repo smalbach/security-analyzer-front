@@ -384,6 +384,14 @@ export interface FlowNodeSkippedEvent {
   reason: string;
 }
 
+export interface FlowLoopIterationEvent {
+  executionId: string;
+  loopNodeId: string;
+  index: number;
+  total: number;
+  item: unknown;
+}
+
 export interface FlowExecutionCompletedEvent {
   executionId: string;
   summary: FlowExecutionSummary;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '../../../lib/cn';
 import { useFlowBuilderStore } from '../../../stores/flowBuilderStore';
+import { useNodeAliasMap } from '../../../hooks/useNodeAliasMap';
 import { HelpTooltip } from '../../ui/HelpTooltip';
 import { ScriptEditor } from '../../endpoint-editor/ScriptEditor';
 import { AuthNodeConfig } from './AuthNodeConfig';
@@ -116,8 +117,29 @@ export function NodeConfigPanel({ projectId }: NodeConfigPanelProps) {
   const { selectedNodeId, nodes, updateNodeConfig, updateNodeData, configPanelTab, setConfigPanelTab } =
     useFlowBuilderStore();
   const { width: panelWidth, onMouseDown: startResize } = useResizableWidth();
+  const { replaceUuidsWithLabels, hasUuidExpressions } = useNodeAliasMap();
+  const migratedNodeRef = useRef<string>('');
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
+
+  // Auto-migrate: convert UUID-based template expressions to label-based aliases
+  // This runs once when a node is selected and its config contains UUIDs
+  useEffect(() => {
+    if (!selectedNode?.id || migratedNodeRef.current === selectedNode.id) return;
+    const config = (selectedNode.data as unknown as FlowCanvasNodeData).config as Record<string, unknown>;
+    const configStr = JSON.stringify(config);
+    if (hasUuidExpressions(configStr)) {
+      const migrated = replaceUuidsWithLabels(configStr);
+      if (migrated !== configStr) {
+        try {
+          const newConfig = JSON.parse(migrated);
+          updateNodeConfig(selectedNode.id, newConfig);
+        } catch { /* ignore parse errors */ }
+      }
+    }
+    migratedNodeRef.current = selectedNode.id;
+  }, [selectedNode?.id, selectedNode?.data, hasUuidExpressions, replaceUuidsWithLabels, updateNodeConfig]);
+
   if (!selectedNode) {
     return (
       <div
@@ -134,7 +156,26 @@ export function NodeConfigPanel({ projectId }: NodeConfigPanelProps) {
   const visibleTabs = getVisibleTabs(nodeData.nodeType);
 
   const handleConfigChange = (newConfig: Record<string, unknown>) => updateNodeConfig(selectedNode.id, newConfig);
-  const handleLabelChange = (label: string) => updateNodeData(selectedNode.id, { label });
+  const handleLabelChange = (newLabel: string) => {
+    const oldLabel = String(nodeData.label || '');
+    updateNodeData(selectedNode.id, { label: newLabel });
+
+    // Propagate label change: update all downstream node configs that reference the old label
+    if (oldLabel && oldLabel !== newLabel) {
+      const { nodes: allNodes, updateNodeConfig: updateConfig } = useFlowBuilderStore.getState();
+      const oldPattern = `{{${oldLabel}.`;
+      const newPattern = `{{${newLabel}.`;
+      for (const n of allNodes) {
+        if (n.id === selectedNode.id) continue;
+        const nConfig = (n.data as unknown as FlowCanvasNodeData).config as Record<string, unknown>;
+        const configStr = JSON.stringify(nConfig);
+        if (configStr.includes(oldPattern)) {
+          const updated = JSON.parse(configStr.replaceAll(oldPattern, newPattern));
+          updateConfig(n.id, updated);
+        }
+      }
+    }
+  };
   const handleOnErrorChange = (onError: string) => updateNodeData(selectedNode.id, { onError: onError as 'stop' | 'continue' | 'error_branch' });
 
   return (

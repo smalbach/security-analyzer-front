@@ -72,12 +72,16 @@ export function useUpstreamDataSources(_projectId: string): DataSource[] {
       const config = node.data.config as Record<string, unknown>;
       const fields: DataSourceField[] = [];
 
+      // Use label as alias in template expressions for readability
+      // Backend resolves both UUID and label references
+      const nodeRef = nodeLabel;
+
       // 1. Explicit extractors
       const extractors = (config.extractors || []) as FlowNodeExtractor[];
       for (const ext of extractors) {
         fields.push({
           name: ext.name,
-          templateExpression: `{{${upId}.${ext.name}}}`,
+          templateExpression: `{{${nodeRef}.${ext.name}}}`,
           origin: 'extractor',
           jsonPath: ext.expression,
         });
@@ -121,7 +125,7 @@ export function useUpstreamDataSources(_projectId: string): DataSource[] {
           }
           fields.push({
             name: s.name,
-            templateExpression: `{{${upId}.${s.name}}}`,
+            templateExpression: `{{${nodeRef}.${s.name}}}`,
             origin: 'schema',
             jsonPath: s.expression,
             fieldType: schemaFieldTypeMap.get(s.name) as DataSourceField['fieldType'],
@@ -133,24 +137,72 @@ export function useUpstreamDataSources(_projectId: string): DataSource[] {
       if (nodeType === 'auth') {
         fields.push({
           name: '__token',
-          templateExpression: `{{${upId}.__token}}`,
+          templateExpression: `{{${nodeRef}.__token}}`,
           origin: 'auth',
         });
       }
 
-      // 4. Loop item variables
+      // 4. Loop item variables + sub-fields from source array schema
       if (nodeType === 'loop') {
         const itemVar = String(config.itemVariable || 'item');
         fields.push({
           name: itemVar,
-          templateExpression: `{{${upId}.${itemVar}}}`,
+          templateExpression: `{{${nodeRef}.${itemVar}}}`,
           origin: 'loop',
+          fieldType: 'object',
         });
         fields.push({
           name: '__index',
-          templateExpression: `{{${upId}.__index}}`,
+          templateExpression: `{{${nodeRef}.__index}}`,
           origin: 'loop',
+          fieldType: 'number',
         });
+
+        // Derive item sub-fields from the source array's schema
+        // e.g., if sourceExpression is "{{reqId.live}}" and live is array<{id, name}>
+        // then expose: "item.id", "item.name"
+        const sourceExpr = String(config.sourceExpression || '');
+        const sourceMatch = sourceExpr.match(/^\{\{([^.]+)\.(.+)\}\}$/);
+        if (sourceMatch) {
+          const [, sourceNodeRef, sourceField] = sourceMatch;
+          // Find source node by UUID or by label alias
+          const sourceNode = nodes.find(
+            (n) => n.id === sourceNodeRef || (n.data.label && String(n.data.label).toLowerCase() === sourceNodeRef.toLowerCase()),
+          );
+          if (sourceNode) {
+            const sourceSchema = (sourceNode.data.config as Record<string, unknown>).responseSchema;
+            if (sourceSchema && typeof sourceSchema === 'object') {
+              const sFields = jsonSchemaToFields(sourceSchema);
+              // Find the array field in the schema
+              const findArrayField = (
+                flds: ReturnType<typeof jsonSchemaToFields>,
+                name: string,
+              ): ReturnType<typeof jsonSchemaToFields>[0] | undefined => {
+                for (const f of flds) {
+                  if (f.name === name) return f;
+                  // Check compound names like "live_subField"
+                  if (f.type === 'object' && f.children?.length) {
+                    const found = findArrayField(f.children, name);
+                    if (found) return found;
+                  }
+                }
+                return undefined;
+              };
+              const arrayField = findArrayField(sFields, sourceField);
+              if (arrayField?.type === 'array' && arrayField.items?.type === 'object' && arrayField.items.children?.length) {
+                for (const child of arrayField.items.children) {
+                  if (!child.name.trim()) continue;
+                  fields.push({
+                    name: `${itemVar}.${child.name}`,
+                    templateExpression: `{{${nodeRef}.${itemVar}.${child.name}}}`,
+                    origin: 'loop',
+                    fieldType: child.type as DataSourceField['fieldType'],
+                  });
+                }
+              }
+            }
+          }
+        }
       }
 
       if (fields.length > 0) {

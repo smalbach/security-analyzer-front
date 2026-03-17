@@ -6,6 +6,7 @@ import type {
   FlowNodeFailedEvent,
   FlowNodeRetryingEvent,
   FlowNodeSkippedEvent,
+  FlowLoopIterationEvent,
   FlowExecutionCompletedEvent,
   FlowExecutionFailedEvent,
   FlowExecutionSummary,
@@ -17,6 +18,7 @@ type StreamCallbacks = {
   onNodeFailed?: (event: FlowNodeFailedEvent) => void;
   onNodeRetrying?: (event: FlowNodeRetryingEvent) => void;
   onNodeSkipped?: (event: FlowNodeSkippedEvent) => void;
+  onLoopIteration?: (event: FlowLoopIterationEvent) => void;
   onExecutionCompleted?: (event: FlowExecutionCompletedEvent) => void;
   onExecutionFailed?: (event: FlowExecutionFailedEvent) => void;
   onExecutionCancelled?: (executionId: string) => void;
@@ -40,6 +42,7 @@ export function useFlowExecutionStream({
   onNodeFailed,
   onNodeRetrying,
   onNodeSkipped,
+  onLoopIteration,
   onExecutionCompleted,
   onExecutionFailed,
   onExecutionCancelled,
@@ -50,11 +53,11 @@ export function useFlowExecutionStream({
 
   const callbacksRef = useRef<StreamCallbacks>({
     onNodeStarted, onNodeCompleted, onNodeFailed, onNodeRetrying,
-    onNodeSkipped, onExecutionCompleted, onExecutionFailed, onExecutionCancelled, onError,
+    onNodeSkipped, onLoopIteration, onExecutionCompleted, onExecutionFailed, onExecutionCancelled, onError,
   });
   callbacksRef.current = {
     onNodeStarted, onNodeCompleted, onNodeFailed, onNodeRetrying,
-    onNodeSkipped, onExecutionCompleted, onExecutionFailed, onExecutionCancelled, onError,
+    onNodeSkipped, onLoopIteration, onExecutionCompleted, onExecutionFailed, onExecutionCancelled, onError,
   };
 
   useEffect(() => {
@@ -92,6 +95,10 @@ export function useFlowExecutionStream({
 
     socket.on('node-skipped', (data: FlowNodeSkippedEvent) => {
       callbacksRef.current.onNodeSkipped?.(data);
+    });
+
+    socket.on('loop-iteration', (data: FlowLoopIterationEvent) => {
+      callbacksRef.current.onLoopIteration?.(data);
     });
 
     socket.on('execution-completed', (data: FlowExecutionCompletedEvent) => {

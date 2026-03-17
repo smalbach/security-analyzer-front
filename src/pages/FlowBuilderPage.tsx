@@ -38,7 +38,7 @@ function FlowBuilderContent() {
     flowName, isDirty, isExecuting, executionId, viewport,
     loadFlow, addNode,
     setNodeStatus, setNodeRetrying, setIsExecuting, setExecutionSummary, setNodeResult,
-    setShowExecutionTimeline, setShowExecutionReport, setFullExecutionData,
+    setShowExecutionTimeline, setShowExecutionReport, setFullExecutionData, addLoopIteration, clearLoopIterations,
   } = useFlowBuilderStore();
 
   const { saving, handleSave, handleRun: rawHandleRun, handleCancel } = useFlowActions({
@@ -86,8 +86,9 @@ function FlowBuilderContent() {
     }
 
     setValidationErrors([]);
+    clearLoopIterations();
     await rawHandleRun();
-  }, [rawHandleRun]);
+  }, [rawHandleRun, clearLoopIterations]);
 
   // ── Load flow on mount ────────────────────────────────────────────────────
   useEffect(() => {
@@ -212,6 +213,9 @@ function FlowBuilderContent() {
         schemaValidation: null, assertionResults: null, scriptOutput: null,
         error: e.reason || 'Skipped',
       });
+    },
+    onLoopIteration: (e) => {
+      addLoopIteration(e.loopNodeId, { index: e.index, total: e.total, item: e.item });
     },
     onExecutionCompleted: (e) => {
       setIsExecuting(false);

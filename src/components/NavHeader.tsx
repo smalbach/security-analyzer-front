@@ -40,7 +40,7 @@ export function NavHeader() {
 
           <div className="app-brand">
             <span className="app-brand-kicker">
-              {theme === 'matrix' ? 'API_SECURITY_ANALYZER' : 'API Security Analyzer'}
+              {theme === 'matrix' ? 'API_SECURITY_ANALYZER' : 'Clean your IA mess'}
             </span>
             <span className="app-brand-caption">{activeTheme.label}</span>
           </div>

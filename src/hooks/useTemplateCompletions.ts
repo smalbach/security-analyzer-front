@@ -63,11 +63,13 @@ export function useTemplateCompletions(projectId: string): TemplateCompletion[] 
       const node = nodes.find((n) => n.id === upId);
       if (!node) continue;
       const nodeLabel = node.data.label || upId.slice(0, 8);
+      // Use label as alias for human-readable expressions (backend resolves both)
+      const nodeRef = String(nodeLabel);
       const extractors = (node.data.config.extractors || []) as FlowNodeExtractor[];
 
       for (const ext of extractors) {
         completions.push({
-          label: `{{${upId}.${ext.name}}}`,
+          label: `{{${nodeRef}.${ext.name}}}`,
           displayLabel: `${nodeLabel}.${ext.name}`,
           detail: `Extractor (${ext.type || 'jsonpath'}) \u00B7 ${ext.expression}`,
           type: 'extractor',
@@ -78,7 +80,7 @@ export function useTemplateCompletions(projectId: string): TemplateCompletion[] 
       // Auth nodes implicitly produce __token
       if (node.data.nodeType === 'auth') {
         completions.push({
-          label: `{{${upId}.__token}}`,
+          label: `{{${nodeRef}.__token}}`,
           displayLabel: `${nodeLabel}.__token`,
           detail: 'Auth token (auto-injected)',
           type: 'extractor',
@@ -96,7 +98,7 @@ export function useTemplateCompletions(projectId: string): TemplateCompletion[] 
         for (const s of suggested) {
           if (existingNames.has(s.name)) continue; // already has an extractor
           completions.push({
-            label: `{{${upId}.${s.name}}}`,
+            label: `{{${nodeRef}.${s.name}}}`,
             displayLabel: `${nodeLabel}.${s.name}`,
             detail: `Schema field \u00B7 ${s.expression} \u00B7 click to auto-create extractor`,
             type: 'schema',
@@ -111,29 +113,60 @@ export function useTemplateCompletions(projectId: string): TemplateCompletion[] 
       }
     }
 
-    // 2c. Loop item variables from upstream loop nodes
+    // 2c. Loop item variables + sub-fields from upstream loop nodes
     for (const upId of upstreamIds) {
       const node = nodes.find((n) => n.id === upId);
       if (!node || node.data.nodeType !== 'loop') continue;
       const loopConfig = node.data.config as Record<string, unknown>;
       const itemVar = String(loopConfig.itemVariable || 'item');
       const nodeLabel = node.data.label || upId.slice(0, 8);
+      const nodeRef = String(nodeLabel);
 
       completions.push({
-        label: `{{${upId}.${itemVar}}}`,
+        label: `{{${nodeRef}.${itemVar}}}`,
         displayLabel: `${nodeLabel}.${itemVar}`,
-        detail: 'Loop iteration item',
+        detail: 'Loop iteration item (full object)',
         type: 'loop',
         boost: 8,
       });
 
       completions.push({
-        label: `{{${upId}.__index}}`,
+        label: `{{${nodeRef}.__index}}`,
         displayLabel: `${nodeLabel}.__index`,
         detail: 'Loop iteration index (0-based)',
         type: 'loop',
         boost: 7,
       });
+
+      // Derive sub-fields from the source array's schema
+      const sourceExpr = String(loopConfig.sourceExpression || '');
+      const sourceMatch = sourceExpr.match(/^\{\{([^.]+)\.(.+)\}\}$/);
+      if (sourceMatch) {
+        const [, sourceNodeRef, sourceField] = sourceMatch;
+        // Find source node by label or by UUID
+        const sourceNode = nodes.find(
+          (n) => n.id === sourceNodeRef || (n.data.label && String(n.data.label).toLowerCase() === sourceNodeRef.toLowerCase()),
+        );
+        if (sourceNode) {
+          const sourceSchema = (sourceNode.data.config as Record<string, unknown>).responseSchema;
+          if (sourceSchema && typeof sourceSchema === 'object') {
+            const sFields = jsonSchemaToFields(sourceSchema);
+            const arrayField = sFields.find((f) => f.name === sourceField);
+            if (arrayField?.type === 'array' && arrayField.items?.type === 'object' && arrayField.items.children?.length) {
+              for (const child of arrayField.items.children) {
+                if (!child.name.trim()) continue;
+                completions.push({
+                  label: `{{${nodeRef}.${itemVar}.${child.name}}}`,
+                  displayLabel: `${nodeLabel}.${itemVar}.${child.name}`,
+                  detail: `Loop item field · ${child.type}`,
+                  type: 'loop',
+                  boost: 7,
+                });
+              }
+            }
+          }
+        }
+      }
     }
 
     // 3. Flow global variables

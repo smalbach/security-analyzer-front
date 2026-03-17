@@ -33,7 +33,11 @@ export function ExtractorList({ config, onChange }: ExtractorListProps) {
 
   const update = (index: number, field: string, value: unknown) => {
     const updated = extractors.map((e, i) => (i === index ? { ...e, [field]: value } : e));
-    onChange({ ...config, extractors: updated });
+    // Filter out completely empty extractors (both name and expression blank) on save
+    const cleaned = updated.filter(
+      (e) => String(e.name || '').trim() || String(e.expression || '').trim(),
+    );
+    onChange({ ...config, extractors: cleaned.length > 0 ? cleaned : updated });
   };
 
   const remove = (index: number) => {
@@ -102,39 +106,55 @@ export function ExtractorList({ config, onChange }: ExtractorListProps) {
       )}
 
       {/* Existing extractors */}
-      {extractors.map((ex, i) => (
-        <div key={i} className="space-y-1.5 rounded-lg border border-white/10 bg-white/[0.02] p-2">
-          {/* Name + remove */}
-          <div className="flex items-center justify-between">
+      {extractors.map((ex, i) => {
+        const nameEmpty = !String(ex.name || '').trim();
+        const exprEmpty = !String(ex.expression || '').trim();
+        const isIncomplete = (nameEmpty && !exprEmpty) || (!nameEmpty && exprEmpty);
+        const isBothEmpty = nameEmpty && exprEmpty;
+        return (
+          <div key={i} className={`space-y-1.5 rounded-lg border p-2 ${isBothEmpty ? 'border-amber-500/25 bg-amber-500/[0.04]' : isIncomplete ? 'border-amber-500/20 bg-amber-500/[0.02]' : 'border-white/10 bg-white/[0.02]'}`}>
+            {/* Name + remove */}
+            <div className="flex items-center justify-between">
+              <input
+                type="text"
+                value={String(ex.name || '')}
+                onChange={(e) => update(i, 'name', e.target.value)}
+                placeholder="Variable name"
+                className="flex-1 bg-transparent text-xs text-slate-200 outline-none placeholder:text-slate-500"
+              />
+              <button type="button" onClick={() => remove(i)} className="ml-1 text-xs text-red-400 transition hover:text-red-300">
+                &times;
+              </button>
+            </div>
+
+            {/* Type */}
+            <CustomSelect
+              value={String(ex.type || 'jsonpath')}
+              onChange={(v) => update(i, 'type', v)}
+              options={[...EXTRACTOR_TYPES]}
+            />
+
+            {/* Expression */}
             <input
               type="text"
-              value={String(ex.name || '')}
-              onChange={(e) => update(i, 'name', e.target.value)}
-              placeholder="Variable name"
-              className="flex-1 bg-transparent text-xs text-slate-200 outline-none placeholder:text-slate-500"
+              value={String(ex.expression || '')}
+              onChange={(e) => update(i, 'expression', e.target.value)}
+              placeholder="Expression (e.g. $.data.id)"
+              className={`${INPUT_CLASS} font-mono`}
             />
-            <button type="button" onClick={() => remove(i)} className="ml-1 text-xs text-red-400 transition hover:text-red-300">
-              &times;
-            </button>
+
+            {/* Validation warning */}
+            {isBothEmpty && (
+              <div className="text-[9px] text-amber-400">Empty extractor — will be removed on next edit</div>
+            )}
+            {isIncomplete && (
+              <div className="text-[9px] text-amber-400">
+                {nameEmpty ? 'Missing variable name' : 'Missing expression'}
+              </div>
+            )}
           </div>
-
-          {/* Type */}
-          <CustomSelect
-            value={String(ex.type || 'jsonpath')}
-            onChange={(v) => update(i, 'type', v)}
-            options={[...EXTRACTOR_TYPES]}
-          />
-
-          {/* Expression */}
-          <input
-            type="text"
-            value={String(ex.expression || '')}
-            onChange={(e) => update(i, 'expression', e.target.value)}
-            placeholder="Expression (e.g. $.data.id)"
-            className={`${INPUT_CLASS} font-mono`}
-          />
-        </div>
-      ))}
+        );
+      })}
 
       <button
         type="button"
