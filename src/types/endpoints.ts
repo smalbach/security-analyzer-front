@@ -34,6 +34,8 @@ export interface EndpointParameters {
   body?: BodySchema;
 }
 
+export type EndpointStatus = 'active' | 'archived' | 'inactive';
+
 export interface ApiEndpoint {
   id: string;
   projectId: string;
@@ -43,6 +45,7 @@ export interface ApiEndpoint {
   parameters: EndpointParameters | null;
   requiresAuth: boolean;
   tags: string[];
+  status: EndpointStatus;
   orderIndex: number;
   preRequestScript: string | null;
   postResponseScript: string | null;

@@ -38,6 +38,9 @@ import type {
   ProjectEnvironment,
   CreateEnvironmentRequest,
   UpdateEnvironmentRequest,
+  ImportableProject,
+  ImportFromProjectRequest,
+  ImportFromProjectResult,
 } from '../types/api';
 import type {
   FlowDefinition,
@@ -214,11 +217,11 @@ export class ApiClient {
   async getEndpoints(projectId: string): Promise<ApiEndpoint[]>;
   async getEndpoints(
     projectId: string,
-    params: { page?: number; limit?: number; search?: string; all?: boolean },
+    params: { page?: number; limit?: number; search?: string; all?: boolean; status?: string },
   ): Promise<PaginatedEndpointsResponse>;
   async getEndpoints(
     projectId: string,
-    params?: { page?: number; limit?: number; search?: string; all?: boolean },
+    params?: { page?: number; limit?: number; search?: string; all?: boolean; status?: string },
   ): Promise<ApiEndpoint[] | PaginatedEndpointsResponse> {
     if (!params) {
       const result = await this.requestProtected<ApiEndpoint[] | { data: ApiEndpoint[] }>(
@@ -235,6 +238,7 @@ export class ApiClient {
       if (params.limit !== undefined) query.set('limit', String(params.limit));
       if (params.search) query.set('search', params.search);
     }
+    if (params.status) query.set('status', params.status);
 
     const qs = query.toString();
     return this.requestProtected<PaginatedEndpointsResponse>(
@@ -285,6 +289,60 @@ export class ApiClient {
     return this.requestProtectedWithAuth<void>(`/projects/${projectId}/endpoints/${endpointId}`, {
       method: 'DELETE',
     });
+  }
+
+  async archiveEndpoint(projectId: string, endpointId: string): Promise<ApiEndpoint> {
+    return this.requestProtectedWithAuth<ApiEndpoint>(
+      `/projects/${projectId}/endpoints/${endpointId}/archive`,
+      { method: 'PATCH' },
+    );
+  }
+
+  async unarchiveEndpoint(projectId: string, endpointId: string): Promise<ApiEndpoint> {
+    return this.requestProtectedWithAuth<ApiEndpoint>(
+      `/projects/${projectId}/endpoints/${endpointId}/unarchive`,
+      { method: 'PATCH' },
+    );
+  }
+
+  async deactivateEndpoint(projectId: string, endpointId: string): Promise<ApiEndpoint> {
+    return this.requestProtectedWithAuth<ApiEndpoint>(
+      `/projects/${projectId}/endpoints/${endpointId}/deactivate`,
+      { method: 'PATCH' },
+    );
+  }
+
+  async activateEndpoint(projectId: string, endpointId: string): Promise<ApiEndpoint> {
+    return this.requestProtectedWithAuth<ApiEndpoint>(
+      `/projects/${projectId}/endpoints/${endpointId}/activate`,
+      { method: 'PATCH' },
+    );
+  }
+
+  async bulkUpdateEndpointStatus(
+    projectId: string,
+    ids: string[],
+    status: 'active' | 'archived' | 'inactive',
+  ): Promise<{ updated: number }> {
+    return this.requestProtectedWithAuth<{ updated: number }>(
+      `/projects/${projectId}/endpoints/bulk-status`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, status }),
+      },
+    );
+  }
+
+  async bulkDeleteEndpoints(projectId: string, ids: string[]): Promise<void> {
+    return this.requestProtectedWithAuth<void>(
+      `/projects/${projectId}/endpoints/bulk`,
+      {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      },
+    );
   }
 
   async importEndpointsFromFile(projectId: string, file: File): Promise<ImportResult> {
@@ -996,6 +1054,32 @@ export class ApiClient {
   async cancelGroupExecution(projectId: string, groupId: string, execId: string): Promise<void> {
     return this.requestProtectedWithAuth(`/projects/${projectId}/flow-groups/${groupId}/executions/${execId}/cancel`, {
       method: 'POST',
+    });
+  }
+
+  // ─── Cross-Project Import ──────────────────────────────────────────────────
+
+  async getAvailableImportProjects(projectId: string): Promise<ImportableProject[]> {
+    return this.requestProtected(`/projects/${projectId}/import/available-projects`);
+  }
+
+  async getImportProjectEndpoints(projectId: string, sourceId: string): Promise<ApiEndpoint[]> {
+    return this.requestProtected(`/projects/${projectId}/import/projects/${sourceId}/endpoints`);
+  }
+
+  async getImportProjectFlows(projectId: string, sourceId: string): Promise<FlowDefinition[]> {
+    return this.requestProtected(`/projects/${projectId}/import/projects/${sourceId}/flows`);
+  }
+
+  async getImportProjectEnvironments(projectId: string, sourceId: string): Promise<ProjectEnvironment[]> {
+    return this.requestProtected(`/projects/${projectId}/import/projects/${sourceId}/environments`);
+  }
+
+  async importFromProject(projectId: string, data: ImportFromProjectRequest): Promise<ImportFromProjectResult> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/import/from-project`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     });
   }
 
