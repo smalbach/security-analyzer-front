@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useTemplateCompletions, type TemplateCompletion } from '../../../hooks/useTemplateCompletions';
 import { useFlowBuilderStore } from '../../../stores/flowBuilderStore';
+import type { FlowNodeExtractor } from '../../../types/flow';
+import { jsonSchemaToFields, schemaFieldsToExtractors } from './SchemaFieldRow';
 
 interface AvailableVariablesProps {
   projectId: string;
@@ -11,25 +13,31 @@ const TYPE_COLORS: Record<string, { badge: string; text: string }> = {
   env: { badge: 'bg-emerald-500/15 text-emerald-400', text: 'text-emerald-400' },
   extractor: { badge: 'bg-sky-500/15 text-sky-400', text: 'text-sky-400' },
   var: { badge: 'bg-amber-500/15 text-amber-400', text: 'text-amber-400' },
+  loop: { badge: 'bg-violet-500/15 text-violet-400', text: 'text-violet-400' },
+  schema: { badge: 'bg-orange-500/15 text-orange-400', text: 'text-orange-400' },
 };
 
 const TYPE_LABELS: Record<string, string> = {
   env: 'ENV',
   extractor: 'NODE',
   var: 'VAR',
+  loop: 'LOOP',
+  schema: 'FIELD',
 };
 
 const SECTION_LABELS: Record<string, string> = {
   env: 'Environment Variables',
   extractor: 'Upstream Node Outputs',
   var: 'Flow Variables',
+  loop: 'Loop Variables',
+  schema: 'Schema Fields (not yet extracted)',
 };
 
 /**
  * Collapsible panel showing all available template variables for the currently
- * selected node. Grouped by type (env, node extractors, flow vars) with
- * copy-to-clipboard for each variable. Shows "USED" badges for variables
- * consumed by variable mappings.
+ * selected node. Grouped by type (env, node extractors, schema fields, loop vars,
+ * flow vars) with copy-to-clipboard for each variable. Shows "USED" badges for
+ * variables consumed by variable mappings.
  */
 export function AvailableVariables({ projectId, variableMappings }: AvailableVariablesProps) {
   const completions = useTemplateCompletions(projectId);
@@ -53,6 +61,8 @@ export function AvailableVariables({ projectId, variableMappings }: AvailableVar
     const envVars = completions.filter((c) => c.type === 'env');
     const extractors = completions.filter((c) => c.type === 'extractor');
     const flowVars = completions.filter((c) => c.type === 'var');
+    const loopVars = completions.filter((c) => c.type === 'loop');
+    const schemaVars = completions.filter((c) => c.type === 'schema');
 
     // Group extractors by upstream node
     const extractorsByNode = new Map<string, { label: string; items: TemplateCompletion[] }>();
@@ -66,7 +76,22 @@ export function AvailableVariables({ projectId, variableMappings }: AvailableVar
       extractorsByNode.get(nodeId)!.items.push(ext);
     }
 
-    return { envVars, extractorsByNode, flowVars };
+    // Group schema vars by upstream node
+    const schemaByNode = new Map<string, { label: string; nodeId: string; items: TemplateCompletion[] }>();
+    for (const sv of schemaVars) {
+      const nodeId = sv.suggestedExtractor?.nodeId || 'unknown';
+      if (!schemaByNode.has(nodeId)) {
+        const node = nodes.find((n) => n.id === nodeId);
+        schemaByNode.set(nodeId, {
+          label: node?.data?.label || nodeId.slice(0, 8),
+          nodeId,
+          items: [],
+        });
+      }
+      schemaByNode.get(nodeId)!.items.push(sv);
+    }
+
+    return { envVars, extractorsByNode, flowVars, loopVars, schemaByNode };
   }, [completions, nodes]);
 
   const totalCount = completions.length;
@@ -76,6 +101,41 @@ export function AvailableVariables({ projectId, variableMappings }: AvailableVar
     navigator.clipboard.writeText(label).then(() => {
       setCopiedLabel(label);
       setTimeout(() => setCopiedLabel(null), 1500);
+    });
+  };
+
+  /** Auto-create a single extractor on the upstream node */
+  const createExtractor = (completion: TemplateCompletion) => {
+    if (!completion.suggestedExtractor) return;
+    const { nodeId, name, expression } = completion.suggestedExtractor;
+    const store = useFlowBuilderStore.getState();
+    const node = store.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const config = node.data.config as Record<string, unknown>;
+    const existing = (config.extractors || []) as FlowNodeExtractor[];
+    if (existing.some((e) => e.name === name)) return;
+    store.updateNodeConfig(nodeId, {
+      ...config,
+      extractors: [...existing, { name, expression, type: 'jsonpath' }],
+    });
+  };
+
+  /** Auto-create ALL extractors for an upstream node from its schema */
+  const createAllExtractorsForNode = (nodeId: string) => {
+    const store = useFlowBuilderStore.getState();
+    const node = store.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const config = node.data.config as Record<string, unknown>;
+    if (!config.responseSchema || typeof config.responseSchema !== 'object') return;
+    const fields = jsonSchemaToFields(config.responseSchema);
+    const suggested = schemaFieldsToExtractors(fields);
+    const existing = (config.extractors || []) as FlowNodeExtractor[];
+    const existingNames = new Set(existing.map((e) => e.name));
+    const newExtractors = suggested.filter((s) => !existingNames.has(s.name));
+    if (newExtractors.length === 0) return;
+    store.updateNodeConfig(nodeId, {
+      ...config,
+      extractors: [...existing, ...newExtractors],
     });
   };
 
@@ -152,6 +212,53 @@ export function AvailableVariables({ projectId, variableMappings }: AvailableVar
             </VariableSection>
           )}
 
+          {/* Schema Fields (not yet extracted) */}
+          {grouped.schemaByNode.size > 0 && (
+            <VariableSection type="schema" count={Array.from(grouped.schemaByNode.values()).reduce((a, b) => a + b.items.length, 0)}>
+              {Array.from(grouped.schemaByNode.entries()).map(([nodeId, group]) => (
+                <div key={nodeId} className="space-y-0.5">
+                  <div className="flex items-center justify-between px-1 pt-1">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-1.5 w-1.5 rounded-full bg-orange-400/60" />
+                      <span className="text-[10px] font-medium text-orange-400/80">{group.label}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => createAllExtractorsForNode(group.nodeId)}
+                      className="rounded bg-orange-500/15 px-1.5 py-0.5 text-[8px] font-semibold text-orange-400 transition hover:bg-orange-500/25"
+                    >
+                      Extract All
+                    </button>
+                  </div>
+                  {group.items.map((c) => (
+                    <SchemaVariableRow
+                      key={c.label}
+                      completion={c}
+                      copied={copiedLabel === c.label}
+                      onCopy={copyToClipboard}
+                      onCreateExtractor={createExtractor}
+                    />
+                  ))}
+                </div>
+              ))}
+            </VariableSection>
+          )}
+
+          {/* Loop Variables */}
+          {grouped.loopVars.length > 0 && (
+            <VariableSection type="loop" count={grouped.loopVars.length}>
+              {grouped.loopVars.map((c) => (
+                <VariableRow
+                  key={c.label}
+                  completion={c}
+                  copied={copiedLabel === c.label}
+                  onCopy={copyToClipboard}
+                  usageTarget={usageMap.get(c.label)}
+                />
+              ))}
+            </VariableSection>
+          )}
+
           {/* Flow Variables */}
           {grouped.flowVars.length > 0 && (
             <VariableSection type="var" count={grouped.flowVars.length}>
@@ -201,12 +308,10 @@ function VariableRow({
   onCopy: (label: string) => void;
   usageTarget?: string;
 }) {
-  // Extract short name from displayLabel (e.g. "env.baseUrl" → "baseUrl", "Auth Login.__token" → "__token")
   const shortName = completion.displayLabel.includes('.')
     ? completion.displayLabel.split('.').pop() || completion.displayLabel
     : completion.displayLabel;
 
-  // Extract detail value (after the " · ")
   const detailValue = completion.detail.includes(' \u00B7 ')
     ? completion.detail.split(' \u00B7 ').pop() || ''
     : completion.detail;
@@ -231,6 +336,55 @@ function VariableRow({
       <span className="min-w-0 flex-1 truncate text-[9px] text-slate-600" title={detailValue}>
         {detailValue}
       </span>
+      <button
+        type="button"
+        onClick={() => onCopy(completion.label)}
+        className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium transition ${
+          copied
+            ? 'bg-emerald-500/20 text-emerald-400'
+            : 'bg-white/5 text-slate-500 opacity-0 group-hover:opacity-100 hover:bg-white/10 hover:text-slate-300'
+        }`}
+        title={`Copy ${completion.label}`}
+      >
+        {copied ? 'Copied!' : 'Copy'}
+      </button>
+    </div>
+  );
+}
+
+function SchemaVariableRow({
+  completion,
+  copied,
+  onCopy,
+  onCreateExtractor,
+}: {
+  completion: TemplateCompletion;
+  copied: boolean;
+  onCopy: (label: string) => void;
+  onCreateExtractor: (c: TemplateCompletion) => void;
+}) {
+  const shortName = completion.displayLabel.includes('.')
+    ? completion.displayLabel.split('.').pop() || completion.displayLabel
+    : completion.displayLabel;
+
+  const jsonPath = completion.suggestedExtractor?.expression || '';
+
+  return (
+    <div className="group flex items-center gap-1.5 px-2 py-1 transition hover:bg-white/5">
+      <span className="min-w-0 shrink-0 font-mono text-[10px] font-medium text-orange-300/80">
+        {shortName}
+      </span>
+      <span className="min-w-0 flex-1 truncate font-mono text-[8px] text-slate-600" title={jsonPath}>
+        {jsonPath}
+      </span>
+      <button
+        type="button"
+        onClick={() => onCreateExtractor(completion)}
+        className="shrink-0 rounded bg-orange-500/15 px-1.5 py-0.5 text-[8px] font-semibold text-orange-400 opacity-0 transition group-hover:opacity-100 hover:bg-orange-500/25"
+        title="Create extractor for this schema field"
+      >
+        Extract
+      </button>
       <button
         type="button"
         onClick={() => onCopy(completion.label)}

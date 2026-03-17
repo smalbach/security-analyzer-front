@@ -4,6 +4,7 @@ import type { FlowNodeStatus, FlowNodeType } from '../../../types/flow';
 
 interface BaseNodeWrapperProps {
   nodeType: FlowNodeType;
+  nodeId?: string;
   label: string;
   status?: FlowNodeStatus;
   retryAttempt?: number;
@@ -69,6 +70,7 @@ const STATUS_CLASSES: Record<FlowNodeStatus, string> = {
 
 export function BaseNodeWrapper({
   nodeType,
+  nodeId,
   label,
   status,
   retryAttempt,
@@ -131,6 +133,11 @@ export function BaseNodeWrapper({
         <span className="truncate text-xs font-medium text-slate-200">
           {label}
         </span>
+        {nodeId && (
+          <span className="ml-auto shrink-0 select-all font-mono text-[8px] text-slate-600" title={nodeId}>
+            #{nodeId.slice(0, 6)}
+          </span>
+        )}
       </div>
 
       {/* Body */}

@@ -1,30 +1,71 @@
 import { ConfigField, ConfigInput } from './ConfigField';
+import { TemplateInput } from './TemplateInput';
+import { AvailableVariables } from './AvailableVariables';
+import { GroupedDataSourceSelect } from './GroupedDataSourceSelect';
+import { useTemplateCompletions } from '../../../hooks/useTemplateCompletions';
+import { useUpstreamDataSources } from '../../../hooks/useUpstreamDataSources';
 
 interface LoopNodeConfigProps {
   config: Record<string, unknown>;
   onChange: (config: Record<string, unknown>) => void;
+  projectId: string;
 }
 
-export function LoopNodeConfig({ config, onChange }: LoopNodeConfigProps) {
+export function LoopNodeConfig({ config, onChange, projectId }: LoopNodeConfigProps) {
   const update = (field: string, value: unknown) => onChange({ ...config, [field]: value });
+  const completions = useTemplateCompletions(projectId);
+  const dataSources = useUpstreamDataSources(projectId);
+
+  // Check if there are any array fields available
+  const hasArrayFields = dataSources.some((ds) =>
+    ds.fields.some((f) => f.fieldType === 'array'),
+  );
 
   return (
     <div className="space-y-3">
+      <AvailableVariables projectId={projectId} />
+
+      {/* Visual array source picker */}
       <ConfigField
-        label="Source Expression"
-        help="Template expression pointing to an array from an upstream node's response. Example: {{request_1.body.data}} iterates over the 'data' array from request_1's response body."
+        label="Array Source"
+        help="Select an array field from an upstream node to iterate over. Only array-type fields are shown here. If no arrays appear, define an array field in an upstream node's Response Schema and generate extractors."
       >
-        <ConfigInput
+        <GroupedDataSourceSelect
+          dataSources={dataSources}
           value={String(config.sourceExpression || '')}
           onChange={(v) => update('sourceExpression', v)}
-          placeholder="{{request_1.body.data}}"
-          mono
+          filterFieldType="array"
+          placeholder="Select an array to iterate over..."
+          emptyMessage="No array fields found. Define arrays in upstream Response Schemas and generate extractors."
         />
       </ConfigField>
 
+      {/* Manual fallback / all sources */}
+      {!hasArrayFields && (
+        <ConfigField
+          label="Source Expression (manual)"
+          help="If no array fields appear above, type a template expression pointing to an array. Type {{ to browse all available variables."
+        >
+          <TemplateInput
+            value={String(config.sourceExpression || '')}
+            onChange={(v) => update('sourceExpression', v)}
+            completions={completions}
+            placeholder="Type {{ to select a source array..."
+          />
+        </ConfigField>
+      )}
+
+      {/* Show the resolved expression for clarity */}
+      {!!config.sourceExpression && (
+        <div className="rounded bg-white/[0.03] px-2 py-1">
+          <span className="text-[9px] text-slate-500">Source expression: </span>
+          <span className="font-mono text-[10px] text-slate-300">{String(config.sourceExpression)}</span>
+        </div>
+      )}
+
       <ConfigField
         label="Item Variable"
-        help="Variable name for the current iteration item. Downstream nodes can reference it as {{loop.item}} (or whatever name you set here)."
+        help="Variable name for the current iteration item. Downstream nodes can reference it as {{loopNodeId.item}} (or whatever name you set here)."
       >
         <ConfigInput
           value={String(config.itemVariable || 'item')}

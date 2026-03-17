@@ -2,13 +2,14 @@ import type { NodeProps } from '@xyflow/react';
 import { BaseNodeWrapper } from './BaseNodeWrapper';
 import type { FlowCanvasNodeData, LoopNodeConfig } from '../../../types/flow';
 
-export function LoopNodeComponent({ data, selected }: NodeProps) {
+export function LoopNodeComponent({ id, data, selected }: NodeProps) {
   const nodeData = data as unknown as FlowCanvasNodeData;
   const config = nodeData.config as unknown as LoopNodeConfig;
 
   return (
     <BaseNodeWrapper
       nodeType="loop"
+      nodeId={id}
       label={nodeData.label}
       status={nodeData.status}
       durationMs={nodeData.durationMs}

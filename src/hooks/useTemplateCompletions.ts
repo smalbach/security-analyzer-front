@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { useFlowBuilderStore } from '../stores/flowBuilderStore';
 import { useEnvironmentStore } from '../stores/environmentStore';
 import type { FlowNodeExtractor } from '../types/flow';
-import type { Edge } from '@xyflow/react';
+import { collectAllUpstream } from './useUpstreamDataSources';
+import { jsonSchemaToFields, schemaFieldsToExtractors } from '../components/flow-testing/panels/SchemaFieldRow';
 
 export interface TemplateCompletion {
   /** Full template string to insert, e.g. "{{env.baseUrl}}" */
@@ -12,15 +13,21 @@ export interface TemplateCompletion {
   /** Extra context shown beside the item, e.g. "Environment · https://..." */
   detail: string;
   /** Category for grouping/styling */
-  type: 'env' | 'extractor' | 'var';
+  type: 'env' | 'extractor' | 'var' | 'loop' | 'schema';
   /** Higher = appears first */
   boost: number;
+  /** For 'schema' type: info needed to auto-create the extractor on the upstream node */
+  suggestedExtractor?: {
+    nodeId: string;
+    name: string;
+    expression: string;
+  };
 }
 
 /**
  * Collects all available template variable completions for the currently
- * selected node: environment variables, upstream node extractors, and
- * flow global variables.
+ * selected node: environment variables, upstream node extractors, schema-derived
+ * fields, loop variables, and flow global variables.
  */
 export function useTemplateCompletions(projectId: string): TemplateCompletion[] {
   const nodes = useFlowBuilderStore((s) => s.nodes);
@@ -78,6 +85,55 @@ export function useTemplateCompletions(projectId: string): TemplateCompletion[] 
           boost: 9,
         });
       }
+
+      // 2b. Schema-derived fields (not yet extracted)
+      const schema = node.data.config.responseSchema;
+      if (schema && typeof schema === 'object') {
+        const schemaFields = jsonSchemaToFields(schema);
+        const suggested = schemaFieldsToExtractors(schemaFields);
+        const existingNames = new Set(extractors.map((e) => e.name));
+
+        for (const s of suggested) {
+          if (existingNames.has(s.name)) continue; // already has an extractor
+          completions.push({
+            label: `{{${upId}.${s.name}}}`,
+            displayLabel: `${nodeLabel}.${s.name}`,
+            detail: `Schema field \u00B7 ${s.expression} \u00B7 click to auto-create extractor`,
+            type: 'schema',
+            boost: 4,
+            suggestedExtractor: {
+              nodeId: upId,
+              name: s.name,
+              expression: s.expression,
+            },
+          });
+        }
+      }
+    }
+
+    // 2c. Loop item variables from upstream loop nodes
+    for (const upId of upstreamIds) {
+      const node = nodes.find((n) => n.id === upId);
+      if (!node || node.data.nodeType !== 'loop') continue;
+      const loopConfig = node.data.config as Record<string, unknown>;
+      const itemVar = String(loopConfig.itemVariable || 'item');
+      const nodeLabel = node.data.label || upId.slice(0, 8);
+
+      completions.push({
+        label: `{{${upId}.${itemVar}}}`,
+        displayLabel: `${nodeLabel}.${itemVar}`,
+        detail: 'Loop iteration item',
+        type: 'loop',
+        boost: 8,
+      });
+
+      completions.push({
+        label: `{{${upId}.__index}}`,
+        displayLabel: `${nodeLabel}.__index`,
+        detail: 'Loop iteration index (0-based)',
+        type: 'loop',
+        boost: 7,
+      });
     }
 
     // 3. Flow global variables
@@ -95,28 +151,4 @@ export function useTemplateCompletions(projectId: string): TemplateCompletion[] 
 
     return completions;
   }, [nodes, edges, selectedNodeId, activeEnv, globalVariables]);
-}
-
-/** BFS to collect ALL upstream node IDs (not just direct parents). */
-function collectAllUpstream(
-  nodeId: string,
-  edges: Edge[],
-): Set<string> {
-  const visited = new Set<string>();
-  const queue = edges
-    .filter((e) => e.target === nodeId)
-    .map((e) => e.source);
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    if (visited.has(current)) continue;
-    visited.add(current);
-    for (const e of edges) {
-      if (e.target === current && !visited.has(e.source)) {
-        queue.push(e.source);
-      }
-    }
-  }
-
-  return visited;
 }

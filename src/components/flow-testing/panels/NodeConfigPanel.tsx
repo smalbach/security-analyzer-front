@@ -51,11 +51,11 @@ function NodeTypeConfig({
   switch (nodeType) {
     case 'auth':      return <AuthNodeConfig config={config} onChange={onChange} projectId={projectId} />;
     case 'request':   return <RequestNodeConfig config={config} onChange={onChange} projectId={projectId} />;
-    case 'condition':  return <ConditionNodeConfig config={config} onChange={onChange} />;
-    case 'loop':      return <LoopNodeConfig config={config} onChange={onChange} />;
+    case 'condition':  return <ConditionNodeConfig config={config} onChange={onChange} projectId={projectId} />;
+    case 'loop':      return <LoopNodeConfig config={config} onChange={onChange} projectId={projectId} />;
     case 'merge':     return <MergeNodeConfig config={config} onChange={onChange} />;
     case 'delay':     return <DelayNodeConfig config={config} onChange={onChange} />;
-    case 'script':    return <ScriptNodeConfig config={config} onChange={onChange} />;
+    case 'script':    return <ScriptNodeConfig config={config} onChange={onChange} projectId={projectId} />;
     default:          return null;
   }
 }
@@ -156,8 +156,11 @@ export function NodeConfigPanel({ projectId }: NodeConfigPanelProps) {
           onChange={(e) => handleLabelChange(e.target.value)}
           className="w-full bg-transparent text-sm font-semibold text-slate-100 outline-none"
         />
-        <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+        <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
           {nodeData.nodeType} node
+          <span className="select-all font-mono text-[9px] normal-case tracking-normal text-slate-600" title={selectedNode.id}>
+            #{selectedNode.id.slice(0, 6)}
+          </span>
         </div>
       </div>
 

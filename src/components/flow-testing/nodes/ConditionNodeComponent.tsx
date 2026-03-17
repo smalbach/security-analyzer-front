@@ -2,13 +2,14 @@ import type { NodeProps } from '@xyflow/react';
 import { BaseNodeWrapper } from './BaseNodeWrapper';
 import type { FlowCanvasNodeData, ConditionNodeConfig } from '../../../types/flow';
 
-export function ConditionNodeComponent({ data, selected }: NodeProps) {
+export function ConditionNodeComponent({ id, data, selected }: NodeProps) {
   const nodeData = data as unknown as FlowCanvasNodeData;
   const config = nodeData.config as unknown as ConditionNodeConfig;
 
   return (
     <BaseNodeWrapper
       nodeType="condition"
+      nodeId={id}
       label={nodeData.label}
       status={nodeData.status}
       durationMs={nodeData.durationMs}

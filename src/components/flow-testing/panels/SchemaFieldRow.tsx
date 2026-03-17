@@ -533,6 +533,52 @@ export function jsonSchemaToFields(schema: unknown): SchemaField[] {
   return fields;
 }
 
+// ---- Generate extractors from schema fields ----
+
+import type { FlowNodeExtractor } from '../../../types/flow';
+
+/**
+ * Recursively walk SchemaField[] and produce one FlowNodeExtractor per
+ * extractable leaf. Objects are recursed into; arrays produce an extractor
+ * for the whole array (useful for loops) plus one per item-child field.
+ */
+export function schemaFieldsToExtractors(
+  fields: SchemaField[],
+  prefix: string = '$',
+): FlowNodeExtractor[] {
+  const extractors: FlowNodeExtractor[] = [];
+
+  for (const field of fields) {
+    if (!field.name.trim()) continue;
+    const path = `${prefix}.${field.name}`;
+
+    if (field.type === 'object' && field.children?.length) {
+      // Recurse into nested object properties
+      extractors.push(...schemaFieldsToExtractors(field.children, path));
+    } else if (field.type === 'array') {
+      // Whole array — needed by loops
+      extractors.push({ name: field.name, expression: path, type: 'jsonpath' });
+
+      // If items are objects, also extract the first-level child fields
+      if (field.items?.type === 'object' && field.items.children?.length) {
+        for (const child of field.items.children) {
+          if (!child.name.trim()) continue;
+          extractors.push({
+            name: `${field.name}_${child.name}`,
+            expression: `${path}[*].${child.name}`,
+            type: 'jsonpath',
+          });
+        }
+      }
+    } else {
+      // Leaf (string, number, integer, boolean)
+      extractors.push({ name: field.name, expression: path, type: 'jsonpath' });
+    }
+  }
+
+  return extractors;
+}
+
 // ---- Infer schema from a real JSON response ----
 
 function inferType(value: unknown): { type: SchemaField['type']; nullable: boolean } {

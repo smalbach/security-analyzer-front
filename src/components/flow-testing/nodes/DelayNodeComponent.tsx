@@ -2,13 +2,14 @@ import type { NodeProps } from '@xyflow/react';
 import { BaseNodeWrapper } from './BaseNodeWrapper';
 import type { FlowCanvasNodeData, DelayNodeConfig } from '../../../types/flow';
 
-export function DelayNodeComponent({ data, selected }: NodeProps) {
+export function DelayNodeComponent({ id, data, selected }: NodeProps) {
   const nodeData = data as unknown as FlowCanvasNodeData;
   const config = nodeData.config as unknown as DelayNodeConfig;
 
   return (
     <BaseNodeWrapper
       nodeType="delay"
+      nodeId={id}
       label={nodeData.label}
       status={nodeData.status}
       durationMs={nodeData.durationMs}

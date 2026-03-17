@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TemplateCompletion } from '../../../hooks/useTemplateCompletions';
+import { useFlowBuilderStore } from '../../../stores/flowBuilderStore';
+import type { FlowNodeExtractor } from '../../../types/flow';
 
 interface TemplateInputProps {
   value: string;
@@ -16,12 +18,16 @@ const TYPE_COLORS: Record<string, string> = {
   env: 'text-emerald-400',
   extractor: 'text-sky-400',
   var: 'text-amber-400',
+  loop: 'text-violet-400',
+  schema: 'text-orange-400',
 };
 
 const TYPE_LABELS: Record<string, string> = {
   env: 'ENV',
   extractor: 'NODE',
   var: 'VAR',
+  loop: 'LOOP',
+  schema: 'FIELD',
 };
 
 /**
@@ -87,6 +93,23 @@ export function TemplateInput({
     (completion: TemplateCompletion) => {
       const openPos = findOpenBrace(value, cursorPos);
       if (openPos === -1) return;
+
+      // Auto-create extractor on the upstream node for schema completions
+      if (completion.type === 'schema' && completion.suggestedExtractor) {
+        const { nodeId, name, expression } = completion.suggestedExtractor;
+        const store = useFlowBuilderStore.getState();
+        const node = store.nodes.find((n) => n.id === nodeId);
+        if (node) {
+          const config = node.data.config as Record<string, unknown>;
+          const existing = (config.extractors || []) as FlowNodeExtractor[];
+          if (!existing.some((e) => e.name === name)) {
+            store.updateNodeConfig(nodeId, {
+              ...config,
+              extractors: [...existing, { name, expression, type: 'jsonpath' }],
+            });
+          }
+        }
+      }
 
       const before = value.slice(0, openPos);
       const after = value.slice(cursorPos);
