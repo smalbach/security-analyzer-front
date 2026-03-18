@@ -41,7 +41,7 @@ export function NavHeader() {
 
           <NavLink to="/" className="app-brand shrink-0">
             <span className="app-brand-kicker">
-              {theme === 'matrix' ? 'API_SEC' : 'API Security'}
+              {theme === 'matrix' ? 'API_SEC' : 'Clean your IA Mess'}
             </span>
             <span className="app-brand-caption">{activeTheme.label}</span>
           </NavLink>

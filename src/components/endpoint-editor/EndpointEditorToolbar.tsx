@@ -86,12 +86,12 @@ export function EndpointEditorToolbar({
         </LinkButton>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-glass backdrop-blur-xl">
-        <div className="flex items-center gap-3">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-3 shadow-glass backdrop-blur-xl">
+        <div className="flex items-center gap-2">
           <select
             value={endpoint.method}
             onChange={(event) => onEndpointChange({ method: event.target.value })}
-            className={`shrink-0 rounded-xl border border-white/10 bg-black/30 px-3 py-2 font-mono text-sm font-bold outline-none focus:border-tide-400/50 ${METHOD_COLORS[endpoint.method ?? 'GET']}`}
+            className={`shrink-0 rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 font-mono text-sm font-bold outline-none focus:border-tide-400/50 ${METHOD_COLORS[endpoint.method ?? 'GET']}`}
           >
             {METHODS.map((method) => (
               <option key={method} value={method}>
@@ -105,44 +105,48 @@ export function EndpointEditorToolbar({
             onChange={(val) => onEndpointChange({ path: val })}
             variables={activeEnv?.variables ?? []}
             placeholder="/api/resource/{id} or {{baseUrl}}/resource"
-            className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-200 outline-none focus:border-tide-400/50"
+            className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-tide-400/50"
           />
-
-          <Button
-            onClick={onSend}
-            disabled={sending || isNew}
-            title={isNew ? 'Save endpoint first' : 'Send request'}
-          >
-            {sending ? '...' : 'Send'}
-          </Button>
-
-          <Button
-            variant="secondary"
-            onClick={onCurlExport}
-            disabled={isNew}
-            title="Export as cURL command"
-          >
-            cURL
-          </Button>
-
-          <Button variant="secondary" onClick={onSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
         </div>
 
         <VariablePreview path={endpoint.path ?? ''} variables={envVariables} />
 
-        {saveError ? <p className="mt-2 text-xs text-red-400">{saveError}</p> : null}
-        {sendError ? <p className="mt-2 text-xs text-red-400">{sendError}</p> : null}
-
-        <div className="mt-3">
+        <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-center">
           <Input
             value={endpoint.description ?? ''}
             onChange={(event) => onEndpointChange({ description: event.target.value })}
             placeholder="Description (optional)"
-            className="bg-white/3 text-slate-400"
+            className="min-w-0 flex-1 bg-white/3 px-3 py-1.5 text-sm text-slate-300"
           />
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              size="sm"
+              onClick={onSend}
+              disabled={sending || isNew}
+              title={isNew ? 'Save endpoint first' : 'Send request'}
+            >
+              {sending ? '...' : 'Send'}
+            </Button>
+
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={onCurlExport}
+              disabled={isNew}
+              title="Export as cURL command"
+            >
+              cURL
+            </Button>
+
+            <Button size="sm" variant="secondary" onClick={onSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
         </div>
+
+        {saveError ? <p className="mt-2 text-xs text-red-400">{saveError}</p> : null}
+        {sendError ? <p className="mt-1 text-xs text-red-400">{sendError}</p> : null}
       </div>
     </>
   );

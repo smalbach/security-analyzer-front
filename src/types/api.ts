@@ -8,3 +8,4 @@ export * from './projects';
 export * from './roles';
 export * from './test-runs';
 export * from './import';
+export * from './github-scanner';

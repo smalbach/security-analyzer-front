@@ -41,6 +41,14 @@ import type {
   ImportableProject,
   ImportFromProjectRequest,
   ImportFromProjectResult,
+  GitHubConnection,
+  ConnectGitHubRequest,
+  ScannedEndpoint,
+  SyncResult,
+  SyncActionItem,
+  SyncHistory,
+  ImpactAnalysis,
+  ApplyImpactRequest,
 } from '../types/api';
 import type {
   FlowDefinition,
@@ -1077,6 +1085,74 @@ export class ApiClient {
 
   async importFromProject(projectId: string, data: ImportFromProjectRequest): Promise<ImportFromProjectResult> {
     return this.requestProtectedWithAuth(`/projects/${projectId}/import/from-project`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  // ─── GitHub Scanner ─────────────────────────────────────────────────────────
+
+  async connectGitHub(projectId: string, data: ConnectGitHubRequest): Promise<GitHubConnection> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/github-scanner/connect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getGitHubConnections(projectId: string): Promise<GitHubConnection[]> {
+    return this.requestProtected(`/projects/${projectId}/github-scanner/connections`);
+  }
+
+  async getGitHubConnection(projectId: string, connectionId: string): Promise<GitHubConnection> {
+    return this.requestProtected(`/projects/${projectId}/github-scanner/connections/${connectionId}`);
+  }
+
+  async deleteGitHubConnection(projectId: string, connectionId: string): Promise<void> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/github-scanner/connections/${connectionId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async scanGitHubRepo(projectId: string, connectionId: string): Promise<ScannedEndpoint[]> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/github-scanner/connections/${connectionId}/scan`, {
+      method: 'POST',
+    });
+  }
+
+  async importScannedEndpoints(projectId: string, connectionId: string, endpoints: ScannedEndpoint[]): Promise<{ imported: number }> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/github-scanner/connections/${connectionId}/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoints }),
+    });
+  }
+
+  async syncGitHubRepo(projectId: string, connectionId: string): Promise<SyncResult> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/github-scanner/connections/${connectionId}/sync`, {
+      method: 'POST',
+    });
+  }
+
+  async applySyncChanges(projectId: string, connectionId: string, actions: SyncActionItem[]): Promise<{ applied: number }> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/github-scanner/connections/${connectionId}/sync/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actions }),
+    });
+  }
+
+  async getGitHubSyncHistory(projectId: string, connectionId: string): Promise<SyncHistory[]> {
+    return this.requestProtected(`/projects/${projectId}/github-scanner/connections/${connectionId}/history`);
+  }
+
+  async getEndpointImpact(projectId: string, endpointId: string): Promise<ImpactAnalysis> {
+    return this.requestProtected(`/projects/${projectId}/github-scanner/impact/${endpointId}`);
+  }
+
+  async applyImpactUpdates(projectId: string, endpointId: string, data: ApplyImpactRequest): Promise<{ updatedFlows: number; updatedPermissions: number }> {
+    return this.requestProtectedWithAuth(`/projects/${projectId}/github-scanner/impact/${endpointId}/apply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),

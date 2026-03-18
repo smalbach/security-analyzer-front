@@ -33,12 +33,14 @@ export function getPathTreeSegments(endpointPath: string): string[] {
     return ['(root)'];
   }
 
+  // Group only up to the module name (first meaningful resource segment).
+  // If the path starts with a version prefix (e.g. v2), use [module, version].
+  // Otherwise just [module]. Everything deeper stays flat under that folder.
   if (segments.length >= 2 && VERSION_PREFIX_REGEX.test(segments[0])) {
-    const [, resource, ...rest] = segments;
-    return [resource, segments[0].toLowerCase(), ...rest];
+    return [segments[1], segments[0].toLowerCase()];
   }
 
-  return segments;
+  return [segments[0]];
 }
 
 export function getDisplayPath(endpointPath: string): string {

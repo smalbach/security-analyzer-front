@@ -13,8 +13,11 @@ import {
 import type { EndpointTreeNode } from '../../lib/endpointTree';
 import { useEndpointSelectionStore } from '../../stores/endpointSelectionStore';
 import type { ApiEndpoint, EndpointStatus, PaginatedEndpointsResponse, Project } from '../../types/api';
-import { Button, ConfirmModal, EmptyState, Input, PageSizeSelector } from '../ui';
+import { Button, ConfirmModal, EmptyState, Input } from '../ui';
 import { ImportFromProjectModal } from './ImportFromProjectModal';
+import { ConnectGitHubModal, GitHubConnectionCard } from '../github-scanner';
+import type { GitHubConnection } from '../../types/api';
+import { EndpointExplorerLayout } from './EndpointExplorerLayout';
 
 const DEFAULT_PAGE_SIZE = 100;
 
@@ -90,7 +93,7 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [pageSize] = useState(DEFAULT_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
@@ -103,13 +106,19 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
 
+  // ─── GitHub Scanner ─────────────────────────────────────────────────────
+  const [showConnectGitHub, setShowConnectGitHub] = useState(false);
+  const [githubConnection, setGithubConnection] = useState<GitHubConnection | null>(null);
+
+  // ─── Inline editor state ─────────────────────────────────────────────────
+  const [selectedEndpointId, setSelectedEndpointId] = useState<string | null>(null);
+
   // ─── Selection store ───────────────────────────────────────────────────────
   const {
     selectedIds,
     setProject,
     toggle,
     toggleGroup,
-    selectAll,
     clearAll,
     isSelected,
   } = useEndpointSelectionStore();
@@ -139,6 +148,17 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
     void fetchEndpoints(1, '', pageSize, statusFilter);
   }, [fetchEndpoints, statusFilter]);
 
+  // Fetch GitHub connection
+  useEffect(() => {
+    let cancelled = false;
+    api.getGitHubConnections(project.id).then((connections) => {
+      if (!cancelled && connections.length > 0) {
+        setGithubConnection(connections[0]);
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [api, project.id]);
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -150,15 +170,9 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
   }, [searchInput]);
 
   const endpointTree = useMemo(() => buildEndpointTree(endpoints), [endpoints]);
-  const allEndpointIds = useMemo(() => endpoints.map((ep) => ep.id), [endpoints]);
 
   const handlePageChange = async (page: number) => {
     await fetchEndpoints(page, search);
-  };
-
-  const handlePageSizeChange = (size: number) => {
-    setPageSize(size);
-    void fetchEndpoints(1, search, size);
   };
 
   const handleStatusFilterChange = (status: StatusFilter) => {
@@ -214,55 +228,7 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
         loading: 'Deleting endpoint...',
         success: 'Endpoint deleted',
       });
-      await fetchEndpoints(currentPage, search);
-    } catch (error) {
-      if (isUnauthorizedError(error)) return;
-    }
-  };
-
-  // ─── Single endpoint status actions ─────────────────────────────────────────
-  const handleArchive = async (endpointId: string) => {
-    try {
-      await toastPromise(api.archiveEndpoint(project.id, endpointId), {
-        loading: 'Archiving endpoint...',
-        success: 'Endpoint archived',
-      });
-      await fetchEndpoints(currentPage, search);
-    } catch (error) {
-      if (isUnauthorizedError(error)) return;
-    }
-  };
-
-  const handleUnarchive = async (endpointId: string) => {
-    try {
-      await toastPromise(api.unarchiveEndpoint(project.id, endpointId), {
-        loading: 'Unarchiving endpoint...',
-        success: 'Endpoint restored to active',
-      });
-      await fetchEndpoints(currentPage, search);
-    } catch (error) {
-      if (isUnauthorizedError(error)) return;
-    }
-  };
-
-  const handleDeactivate = async (endpointId: string) => {
-    try {
-      await toastPromise(api.deactivateEndpoint(project.id, endpointId), {
-        loading: 'Deactivating endpoint...',
-        success: 'Endpoint deactivated',
-      });
-      await fetchEndpoints(currentPage, search);
-    } catch (error) {
-      if (isUnauthorizedError(error)) return;
-    }
-  };
-
-  const handleActivate = async (endpointId: string) => {
-    try {
-      await toastPromise(api.activateEndpoint(project.id, endpointId), {
-        loading: 'Activating endpoint...',
-        success: 'Endpoint activated',
-      });
+      if (selectedEndpointId === id) setSelectedEndpointId(null);
       await fetchEndpoints(currentPage, search);
     } catch (error) {
       if (isUnauthorizedError(error)) return;
@@ -299,6 +265,7 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
         loading: `Deleting ${ids.length} endpoints...`,
         success: `${ids.length} endpoints deleted`,
       });
+      if (selectedEndpointId && ids.includes(selectedEndpointId)) setSelectedEndpointId(null);
       clearAll();
       await fetchEndpoints(currentPage, search);
     } catch (error) {
@@ -318,220 +285,188 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
     });
   };
 
-  const renderEndpointActions = (endpoint: ApiEndpoint) => {
-    const status = endpoint.status ?? 'active';
-    return (
-      <div className="flex items-center justify-end gap-1.5 opacity-0 transition-opacity duration-150 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto">
-        <Button
-          variant="secondary"
-          size="xs"
-          onClick={() => navigate(`/projects/${project.id}/endpoints/${endpoint.id}`)}
-        >
-          Edit
-        </Button>
-        {status === 'active' && (
-          <>
-            <Button variant="secondary" size="xs" onClick={() => void handleArchive(endpoint.id)}>
-              Archive
-            </Button>
-            <Button variant="secondary" size="xs" onClick={() => void handleDeactivate(endpoint.id)}>
-              Deactivate
-            </Button>
-          </>
-        )}
-        {status === 'archived' && (
-          <Button variant="secondary" size="xs" onClick={() => void handleUnarchive(endpoint.id)}>
-            Unarchive
-          </Button>
-        )}
-        {status === 'inactive' && (
-          <Button variant="secondary" size="xs" onClick={() => void handleActivate(endpoint.id)}>
-            Activate
-          </Button>
-        )}
-        <Button variant="danger" size="xs" onClick={() => void handleDelete(endpoint.id)}>
-          Delete
-        </Button>
-      </div>
-    );
-  };
-
   const renderNode = (node: EndpointTreeNode, level = 0) => {
     const hasChildren = node.children.length > 0;
     const hasEndpoints = node.endpoints.length > 0;
     const isExpanded = expandedNodes.has(node.id);
     const endpointCount = countNodeEndpoints(node);
-    const directEndpointCount = node.endpoints.length;
     const nodeEndpointIds = getAllEndpointIds(node);
 
     return (
-      <div key={node.id} className="space-y-2" style={{ paddingLeft: `${level * 14}px` }}>
-        <div className="group flex w-full min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 transition hover:border-tide-400/40 hover:bg-white/[0.06]">
+      <div key={node.id} style={{ paddingLeft: level > 0 ? 12 : 0 }}>
+        {/* Folder row */}
+        <div
+          className="group flex min-w-0 items-center gap-1.5 rounded px-2 py-1 cursor-pointer transition-colors hover:bg-white/[0.06]"
+          onClick={() => toggleNode(node.id)}
+        >
           <GroupCheckbox ids={nodeEndpointIds} onToggle={toggleGroup} />
-          <button
-            type="button"
-            onClick={() => toggleNode(node.id)}
-            className="flex min-w-0 flex-1 items-center gap-2 text-left"
-          >
-            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-slate-300">
-              {hasChildren || hasEndpoints ? (isExpanded ? '-' : '+') : ' '}
-            </span>
-            <span className="truncate font-mono text-sm text-slate-100">{node.label}</span>
-            {VERSION_PREFIX_REGEX.test(node.label) ? (
-              <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-300">
-                Version
-              </span>
-            ) : null}
-            <span className="ml-auto hidden text-[11px] text-slate-400 sm:block">
-              {directEndpointCount} directos | {endpointCount} total
-            </span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
-              {endpointCount}
-            </span>
-          </button>
+          <span className="text-[11px] text-slate-500 w-3 text-center select-none">
+            {hasChildren || hasEndpoints ? (isExpanded ? '▾' : '▸') : ' '}
+          </span>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="shrink-0 text-amber-400/70">
+            {isExpanded
+              ? <path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v1.25l.005.078A2 2 0 0 1 2 3h10.5a.5.5 0 0 1 .5.5v.5h1a1.5 1.5 0 0 0-1.5-1.5h-4L7.414 1.414A2 2 0 0 0 6 .793H3A1.5 1.5 0 0 0 1.5 2zM2 5a1 1 0 0 0-.993.883L.5 13.5A1.5 1.5 0 0 0 2 15h12a1.5 1.5 0 0 0 1.5-1.5L15 6a1 1 0 0 0-1-1H2z" />
+              : <path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 14.5 4H8L6.854 2.854A2 2 0 0 0 5.44 2.293H1.5z" />
+            }
+          </svg>
+          <span className="truncate font-mono text-xs text-slate-200">{node.label}</span>
+          {VERSION_PREFIX_REGEX.test(node.label) && (
+            <span className="rounded bg-sky-400/10 px-1 text-[9px] font-bold uppercase text-sky-400">v</span>
+          )}
+          <span className="ml-auto text-[10px] tabular-nums text-slate-500">{endpointCount}</span>
         </div>
 
-        {isExpanded ? (
-          <div className="space-y-2">
+        {/* Children */}
+        {isExpanded && (
+          <div>
             {node.endpoints.map((endpoint) => {
               const epStatus = endpoint.status ?? 'active';
+              const isActive = selectedEndpointId === endpoint.id;
               return (
-                <div key={endpoint.id} className="pl-[14px]">
-                  <div
-                    className={`group flex min-w-0 items-center gap-3 rounded-xl border px-4 py-3 transition ${
-                      isSelected(endpoint.id)
-                        ? 'border-tide-400/40 bg-tide-500/[0.10]'
-                        : epStatus === 'archived'
-                          ? 'border-amber-500/20 bg-amber-500/[0.05] hover:border-amber-400/40 hover:bg-amber-500/[0.10]'
-                          : epStatus === 'inactive'
-                            ? 'border-slate-500/20 bg-slate-500/[0.05] hover:border-slate-400/40 hover:bg-slate-500/[0.10]'
-                            : 'border-emerald-500/20 bg-emerald-500/[0.07] hover:border-emerald-400/40 hover:bg-emerald-500/[0.12]'
+                <div
+                  key={endpoint.id}
+                  className={`group flex min-w-0 items-center gap-1.5 rounded px-2 py-[3px] ml-3 cursor-pointer transition-colors ${
+                    isActive
+                      ? 'bg-tide-500/20 text-white'
+                      : 'hover:bg-white/[0.05] text-slate-300'
+                  }`}
+                  onClick={() => setSelectedEndpointId(endpoint.id)}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected(endpoint.id)}
+                    onChange={() => toggle(endpoint.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-3 w-3 shrink-0 cursor-pointer rounded border-white/20 accent-tide-400"
+                    aria-label={`Select ${endpoint.method} ${endpoint.path}`}
+                  />
+                  <span
+                    className={`shrink-0 w-[42px] text-center rounded font-mono text-[10px] font-bold leading-[18px] ${
+                      METHOD_COLOR[endpoint.method] ?? 'text-slate-400'
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={isSelected(endpoint.id)}
-                      onChange={() => toggle(endpoint.id)}
-                      className="h-4 w-4 shrink-0 cursor-pointer rounded border-white/20 accent-tide-400"
-                      aria-label={`Select ${endpoint.method} ${endpoint.path}`}
-                    />
-                    <span className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
-                      Endpoint
+                    {endpoint.method}
+                  </span>
+                  <span
+                    className={`min-w-0 flex-1 truncate font-mono text-xs ${
+                      epStatus === 'inactive' ? 'text-slate-500 line-through' : ''
+                    }`}
+                  >
+                    {getDisplayPath(endpoint.path)}
+                  </span>
+                  {endpoint.requiresAuth && (
+                    <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" className="shrink-0 text-sky-400/60" aria-label="Requires auth">
+                      <path d="M8 1a3.5 3.5 0 0 0-3.5 3.5V6H3.5A1.5 1.5 0 0 0 2 7.5v6A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 12.5 6h-1V4.5A3.5 3.5 0 0 0 8 1zm2 5V4.5a2 2 0 1 0-4 0V6h4z" />
+                    </svg>
+                  )}
+                  {(statusFilter === 'all' || epStatus !== 'active') && (
+                    <span className={`text-[9px] font-semibold ${STATUS_BADGE[epStatus]}`}>
+                      {STATUS_LABEL[epStatus][0]}
                     </span>
-                    <span
-                      className={`shrink-0 rounded-md border px-2 py-0.5 font-mono text-xs font-bold ${
-                        METHOD_COLOR[endpoint.method] ?? 'border-white/10 bg-white/5 text-slate-400'
-                      }`}
-                    >
-                      {endpoint.method}
-                    </span>
+                  )}
+                  {/* Hover actions */}
+                  <div className="hidden items-center gap-0.5 group-hover:flex" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
                       onClick={() => navigate(`/projects/${project.id}/endpoints/${endpoint.id}`)}
-                      className={`min-w-0 flex-1 truncate text-left font-mono text-sm hover:text-tide-300 ${
-                        epStatus === 'inactive' ? 'text-slate-400 line-through' : 'text-slate-200'
-                      }`}
+                      className="rounded p-0.5 text-slate-500 hover:bg-white/10 hover:text-slate-200"
+                      title="Open full page"
                     >
-                      {getDisplayPath(endpoint.path)}
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 1A1.5 1.5 0 0 0 3 2.5v11A1.5 1.5 0 0 0 4.5 15H12a1 1 0 0 0 1-1V5.5L9.5 2H8v3.5A1.5 1.5 0 0 1 6.5 7H4V2.5A.5.5 0 0 1 4.5 2h1V1h-1zm5 0v3.5a.5.5 0 0 0 .5.5h3.5L9.5 1z" /></svg>
                     </button>
-
-                    {/* Status badge */}
-                    {(statusFilter === 'all' || epStatus !== 'active') && (
-                      <span
-                        className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:inline-block ${STATUS_BADGE[epStatus]}`}
-                      >
-                        {STATUS_LABEL[epStatus]}
-                      </span>
-                    )}
-
-                    {/* Auth badge */}
-                    <span
-                      className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:inline-block ${
-                        endpoint.requiresAuth
-                          ? 'border-sky-400/30 bg-sky-400/10 text-sky-300'
-                          : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
-                      }`}
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(endpoint.id)}
+                      className="rounded p-0.5 text-slate-500 hover:bg-red-500/20 hover:text-red-400"
+                      title="Delete"
                     >
-                      {endpoint.requiresAuth ? 'Auth' : 'Public'}
-                    </span>
-
-                    {endpoint.description ? (
-                      <span className="hidden max-w-xs truncate text-xs text-slate-500 sm:block">
-                        {endpoint.description}
-                      </span>
-                    ) : null}
-                    {renderEndpointActions(endpoint)}
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm-7-3A1.5 1.5 0 0 1 5 1h6a1.5 1.5 0 0 1 1.5 1.5H15v1H1v-1h2.5zM2 5h12l-.94 9.398A2 2 0 0 1 11.07 16H4.93a2 2 0 0 1-1.99-1.602L2 5z" /></svg>
+                    </button>
                   </div>
                 </div>
               );
             })}
             {node.children.map((childNode) => renderNode(childNode, level + 1))}
           </div>
-        ) : null}
+        )}
       </div>
     );
   };
 
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => navigate(`/projects/${project.id}/endpoints/new`)}>Add Endpoint</Button>
-        <Button variant="secondary" onClick={() => setShowImportPanel((current) => !current)}>
-          {showImportPanel ? 'Hide import' : 'Import'}
+  const listContent = (
+    <div className="space-y-2">
+      {/* Compact toolbar */}
+      <div className="flex items-center gap-1.5">
+        <Button size="xs" onClick={() => navigate(`/projects/${project.id}/endpoints/new`)}>+ New</Button>
+        <Button variant="secondary" size="xs" onClick={() => setShowImportPanel((c) => !c)}>
+          {showImportPanel ? 'Hide' : 'Import'}
         </Button>
-        <Button variant="secondary" onClick={() => setShowImportFromProject(true)}>
-          Import from Project
+        <Button variant="secondary" size="xs" onClick={() => setShowImportFromProject(true)}>
+          From Project
         </Button>
+        <Button
+          variant="secondary"
+          size="xs"
+          onClick={() => githubConnection ? undefined : setShowConnectGitHub(true)}
+          className={githubConnection ? 'border-emerald-500/30 text-emerald-400' : ''}
+        >
+          GitHub
+        </Button>
+        <span className="ml-auto text-[10px] tabular-nums text-slate-500">
+          {pagination?.total ?? endpoints.length}
+        </span>
       </div>
 
-      {showImportPanel ? (
-        <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-              From File (OpenAPI, Postman, Insomnia, Markdown)
-            </p>
-            <div className="flex flex-col gap-2 md:flex-row">
-              <input
-                type="file"
-                accept=".yaml,.yml,.json,.md,.txt"
-                onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
-                className="flex-1 text-sm text-slate-400 file:mr-3 file:rounded-lg file:border file:border-white/10 file:bg-white/5 file:px-3 file:py-1 file:text-xs file:text-slate-300"
-              />
-              <Button onClick={() => void handleImportFile()} disabled={!importFile || importing}>
-                {importing ? 'Importing...' : 'Import'}
-              </Button>
-            </div>
+      {showImportPanel && (
+        <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-2 text-xs">
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept=".yaml,.yml,.json,.md,.txt"
+              onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+              className="min-w-0 flex-1 text-[11px] text-slate-400 file:mr-2 file:rounded file:border file:border-white/10 file:bg-white/5 file:px-2 file:py-0.5 file:text-[10px] file:text-slate-300"
+            />
+            <Button size="xs" onClick={() => void handleImportFile()} disabled={!importFile || importing}>
+              {importing ? '...' : 'Go'}
+            </Button>
           </div>
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">From cURL</p>
-            <div className="flex flex-col gap-2 md:flex-row">
-              <Input
-                value={curlInput}
-                onChange={(event) => setCurlInput(event.target.value)}
-                placeholder='curl -X POST https://api.example.com/users -H "..."'
-                className="min-w-0 flex-1 font-mono"
-              />
-              <Button onClick={() => void handleImportCurl()} disabled={!curlInput.trim() || curlImporting}>
-                {curlImporting ? 'Adding...' : 'Add'}
-              </Button>
-            </div>
+          <div className="flex items-center gap-2">
+            <Input
+              value={curlInput}
+              onChange={(event) => setCurlInput(event.target.value)}
+              placeholder="Paste cURL..."
+              className="min-w-0 flex-1 font-mono !py-1 !text-[11px]"
+            />
+            <Button size="xs" onClick={() => void handleImportCurl()} disabled={!curlInput.trim() || curlImporting}>
+              {curlImporting ? '...' : 'Add'}
+            </Button>
           </div>
         </div>
-      ) : null}
+      )}
 
-      {/* Status filter tabs */}
-      <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
+      {/* GitHub Connection Card */}
+      {githubConnection && (
+        <GitHubConnectionCard
+          projectId={project.id}
+          connection={githubConnection}
+          onDeleted={() => {
+            setGithubConnection(null);
+          }}
+          onEndpointsChanged={() => void fetchEndpoints(1, search)}
+        />
+      )}
+
+      {/* Status filter tabs - compact */}
+      <div className="flex items-center gap-0.5 rounded-lg border border-white/10 bg-white/[0.03] p-0.5">
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.value}
             type="button"
             onClick={() => handleStatusFilterChange(tab.value)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
               statusFilter === tab.value
                 ? 'bg-white/10 text-white'
-                : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                : 'text-slate-500 hover:bg-white/5 hover:text-slate-300'
             }`}
           >
             {tab.label}
@@ -539,150 +474,97 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
         ))}
       </div>
 
-      {/* Search */}
+      {/* Search - compact */}
       <Input
         value={searchInput}
         onChange={(e) => setSearchInput(e.target.value)}
-        placeholder="Search endpoints by path or description..."
-        className="bg-white/5"
+        placeholder="Search..."
+        className="bg-white/5 !py-1 !text-xs"
       />
 
       {loading ? (
-        <div className="py-10 text-center text-slate-500">Loading...</div>
+        <div className="py-6 text-center text-xs text-slate-500">Loading...</div>
       ) : endpoints.length === 0 ? (
         <EmptyState
-          title={search ? 'No endpoints match your search.' : statusFilter !== 'active' ? `No ${statusFilter === 'all' ? '' : statusFilter + ' '}endpoints.` : 'No endpoints yet.'}
-          description={
-            search
-              ? 'Try a different search term.'
-              : statusFilter !== 'active'
-                ? 'There are no endpoints with this status.'
-                : 'Add a new endpoint or import an existing collection to start testing.'
-          }
+          title={search ? 'No matches.' : 'No endpoints yet.'}
+          description={search ? 'Try a different search.' : 'Add or import endpoints to begin.'}
           action={
             search ? (
-              <Button variant="secondary" size="sm" onClick={() => setSearchInput('')}>
-                Clear search
+              <Button variant="secondary" size="xs" onClick={() => setSearchInput('')}>
+                Clear
               </Button>
             ) : undefined
           }
         />
       ) : (
-        <div className="space-y-3">
-          {/* ── Header bar ── */}
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-gradient-to-r from-white/10 via-white/5 to-transparent px-4 py-3">
-            <div>
-              <p className="text-xs uppercase tracking-widest text-slate-400">Endpoint explorer</p>
-              <p className="text-sm text-slate-200">
-                {pagination
-                  ? `Showing ${endpoints.length} of ${pagination.total} endpoints`
-                  : `${endpoints.length} endpoints`}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {selectedIds.size > 0 ? (
-                <>
-                  <span className="rounded-full border border-tide-400/30 bg-tide-500/10 px-3 py-1 text-xs font-semibold text-tide-300">
-                    {selectedIds.size} selected
-                  </span>
-                  <button
-                    type="button"
-                    onClick={clearAll}
-                    className="text-xs text-slate-400 transition hover:text-white"
-                  >
-                    Clear
-                  </button>
-                </>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => selectAll(allEndpointIds)}
-                className="text-xs text-slate-400 transition hover:text-slate-200"
-              >
-                Select all on page
-              </button>
-              <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} disabled={loading} />
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
-                {pagination?.total ?? endpoints.length} total
-              </span>
-            </div>
-          </div>
-
-          {/* ── Bulk actions bar ── */}
+        <div className="space-y-0">
+          {/* Bulk actions bar */}
           {selectedIds.size > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-tide-400/20 bg-tide-500/[0.06] px-4 py-2.5">
-              <span className="mr-1 text-xs font-semibold text-tide-300">
-                {selectedIds.size} selected:
-              </span>
+            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-tide-400/20 bg-tide-500/[0.06] px-2 py-1.5 mb-1">
+              <span className="text-[10px] font-semibold text-tide-300">{selectedIds.size} sel</span>
               {(statusFilter === 'active' || statusFilter === 'all') && (
                 <>
-                  <Button variant="secondary" size="xs" onClick={() => void handleBulkStatus('archived')}>
-                    Archive
-                  </Button>
-                  <Button variant="secondary" size="xs" onClick={() => void handleBulkStatus('inactive')}>
-                    Deactivate
-                  </Button>
+                  <Button variant="secondary" size="xs" onClick={() => void handleBulkStatus('archived')}>Arc</Button>
+                  <Button variant="secondary" size="xs" onClick={() => void handleBulkStatus('inactive')}>Deact</Button>
                 </>
               )}
               {(statusFilter === 'archived' || statusFilter === 'inactive' || statusFilter === 'all') && (
-                <Button variant="secondary" size="xs" onClick={() => void handleBulkStatus('active')}>
-                  Activate
-                </Button>
+                <Button variant="secondary" size="xs" onClick={() => void handleBulkStatus('active')}>Act</Button>
               )}
-              {statusFilter === 'archived' && (
-                <Button variant="secondary" size="xs" onClick={() => void handleBulkStatus('active')}>
-                  Unarchive
-                </Button>
-              )}
-              <Button variant="danger" size="xs" onClick={() => setConfirmBulkDelete(true)}>
-                Delete
-              </Button>
+              <Button variant="danger" size="xs" onClick={() => setConfirmBulkDelete(true)}>Del</Button>
+              <button type="button" onClick={clearAll} className="ml-auto text-[10px] text-slate-400 hover:text-white">clear</button>
             </div>
           )}
 
+          {/* File tree */}
           {endpointTree.map((node) => renderNode(node))}
 
-          {/* Pagination */}
-          {pagination && pagination.totalPages > 1 ? (
-            <div className="flex items-center justify-center gap-2 pt-4">
-              <Button
-                variant="secondary"
-                size="sm"
+          {/* Compact pagination */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="flex items-center justify-center gap-1 pt-2">
+              <button
                 disabled={currentPage <= 1 || loading}
                 onClick={() => void handlePageChange(currentPage - 1)}
+                className="rounded px-1.5 py-0.5 text-[10px] text-slate-400 hover:bg-white/10 disabled:opacity-30"
               >
-                ← Prev
-              </Button>
-              <div className="flex gap-1">
-                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
-                  .filter((p) => Math.abs(p - currentPage) <= 2)
-                  .map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => void handlePageChange(p)}
-                      disabled={loading}
-                      className={`h-8 w-8 rounded-lg text-sm font-medium transition-colors ${
-                        p === currentPage
-                          ? 'bg-tide-500 text-white'
-                          : 'text-slate-400 hover:bg-white/10 hover:text-slate-200'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
+                Prev
+              </button>
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                .filter((p) => Math.abs(p - currentPage) <= 2)
+                .map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => void handlePageChange(p)}
+                    disabled={loading}
+                    className={`h-5 w-5 rounded text-[10px] font-medium ${
+                      p === currentPage ? 'bg-tide-500 text-white' : 'text-slate-400 hover:bg-white/10'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              <button
                 disabled={currentPage >= pagination.totalPages || loading}
                 onClick={() => void handlePageChange(currentPage + 1)}
+                className="rounded px-1.5 py-0.5 text-[10px] text-slate-400 hover:bg-white/10 disabled:opacity-30"
               >
-                Next →
-              </Button>
+                Next
+              </button>
             </div>
-          ) : null}
+          )}
         </div>
       )}
+    </div>
+  );
+
+  return (
+    <>
+      <EndpointExplorerLayout
+        projectId={project.id}
+        selectedEndpointId={selectedEndpointId}
+        onEndpointSaved={() => void fetchEndpoints(currentPage, search)}
+        listContent={listContent}
+      />
       {confirmDelete ? (
         <ConfirmModal
           title="Delete endpoint"
@@ -708,6 +590,16 @@ export function EndpointsTab({ project }: EndpointsTabProps) {
           onImported={() => void fetchEndpoints(1, search)}
         />
       ) : null}
-    </div>
+      {showConnectGitHub ? (
+        <ConnectGitHubModal
+          projectId={project.id}
+          onClose={() => setShowConnectGitHub(false)}
+          onConnected={(connection) => {
+            setGithubConnection(connection);
+            setShowConnectGitHub(false);
+          }}
+        />
+      ) : null}
+    </>
   );
 }

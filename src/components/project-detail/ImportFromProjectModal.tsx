@@ -145,7 +145,7 @@ export function ImportFromProjectModal({
     if (!selectedProject || totalSelected === 0) return;
     setImporting(true);
     try {
-      const result = await toastPromise(
+      await toastPromise(
         api.importFromProject(projectId, {
           sourceProjectId: selectedProject.id,
           endpointIds: selectedEndpointIds.size > 0 ? Array.from(selectedEndpointIds) : undefined,

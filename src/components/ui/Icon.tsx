@@ -80,6 +80,26 @@ export const ArrowLeftIcon = icon(
   </>,
 );
 
+export const ChevronLeftIcon = icon(
+  <path d="M12.5 5l-5 5 5 5" />,
+);
+
+export const CollapseIcon = icon(
+  <>
+    <path d="M4 4h12v12H4z" strokeWidth={0} fill="none" />
+    <path d="M3 5h4v10H3zM9 5h8v10H9z" />
+    <path d="M6 9l-1.5 1 1.5 1" />
+  </>,
+);
+
+export const ExpandIcon = icon(
+  <>
+    <path d="M4 4h12v12H4z" strokeWidth={0} fill="none" />
+    <path d="M3 5h4v10H3zM9 5h8v10H9z" />
+    <path d="M4 9l1.5 1-1.5 1" />
+  </>,
+);
+
 export const FlowTestingIcon = icon(
   <>
     <circle cx="4" cy="10" r="2" />

@@ -2,6 +2,8 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { useOptionalProjectContext } from '../../contexts/ProjectContext';
 import {
   ArrowLeftIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   EndpointsIcon,
   FlowTestingIcon,
   HelpIcon,
@@ -12,6 +14,7 @@ import {
 } from '../ui/Icon';
 import { HelpTooltip } from '../ui/HelpTooltip';
 import { useHelp } from '../../contexts/HelpContext';
+import { useSidebarStore } from '../../stores/sidebarStore';
 
 type Tab = 'endpoints' | 'roles' | 'test-runs' | 'performance' | 'flow-testing' | 'settings';
 
@@ -91,6 +94,7 @@ export function ProjectSidebar() {
   const [searchParams] = useSearchParams();
   const { openHelp } = useHelp();
   const navigate = useNavigate();
+  const { collapsed, toggle } = useSidebarStore();
 
   if (!ctx?.project) return null;
 
@@ -103,67 +107,105 @@ export function ProjectSidebar() {
   }
 
   return (
-    <aside className="project-sidebar">
+    <aside className={`project-sidebar ${collapsed ? 'project-sidebar--collapsed' : ''}`}>
       {/* Project info */}
       <div className="project-sidebar-project-info">
-        <button
-          type="button"
-          onClick={() => navigate('/projects')}
-          className="project-sidebar-back-btn"
-        >
-          <ArrowLeftIcon width={14} height={14} />
-          <span>All Projects</span>
-        </button>
-        <div
-          className="mt-3 mb-2 h-0.5 w-8 rounded-full"
-          style={{ background: 'rgb(var(--accent-400))' }}
-        />
-        <p
-          className="truncate text-sm font-semibold leading-snug"
-          style={{ color: 'var(--text-primary)' }}
-          title={project.name}
-        >
-          {project.name}
-        </p>
-        {project.baseUrl ? (
-          <p
-            className="mt-0.5 truncate font-mono text-xs"
-            style={{ color: 'var(--text-secondary)' }}
-            title={project.baseUrl}
+        {collapsed ? (
+          <button
+            type="button"
+            onClick={() => navigate('/projects')}
+            className="project-sidebar-back-btn project-sidebar-back-btn--icon-only"
+            title="All Projects"
           >
-            {project.baseUrl}
-          </p>
-        ) : null}
+            <ArrowLeftIcon width={14} height={14} />
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => navigate('/projects')}
+              className="project-sidebar-back-btn"
+            >
+              <ArrowLeftIcon width={14} height={14} />
+              <span>All Projects</span>
+            </button>
+            <div
+              className="mt-3 mb-2 h-0.5 w-8 rounded-full"
+              style={{ background: 'rgb(var(--accent-400))' }}
+            />
+            <p
+              className="truncate text-sm font-semibold leading-snug"
+              style={{ color: 'var(--text-primary)' }}
+              title={project.name}
+            >
+              {project.name}
+            </p>
+            {project.baseUrl ? (
+              <p
+                className="mt-0.5 truncate font-mono text-xs"
+                style={{ color: 'var(--text-secondary)' }}
+                title={project.baseUrl}
+              >
+                {project.baseUrl}
+              </p>
+            ) : null}
+          </>
+        )}
       </div>
 
       {/* Nav items */}
       <nav className="project-sidebar-nav" aria-label="Project sections">
-        <div className="project-sidebar-section-label">Navigation</div>
+        {!collapsed && <div className="project-sidebar-section-label">Navigation</div>}
         {NAV_ITEMS.map(({ id, label, icon: Icon, tooltip }) => (
           <div key={id} className="project-sidebar-item-row">
             <button
               type="button"
               onClick={() => setTab(id)}
+              title={collapsed ? label : undefined}
               className={`project-sidebar-item flex-1 ${activeTab === id ? 'project-sidebar-item-active' : ''}`}
             >
               <Icon width={18} height={18} className="flex-shrink-0 opacity-75" />
-              <span className="flex-1">{label}</span>
+              {!collapsed && <span className="flex-1">{label}</span>}
             </button>
-            <HelpTooltip content={tooltip} position="right" />
+            {!collapsed && <HelpTooltip content={tooltip} position="right" />}
           </div>
         ))}
       </nav>
 
       {/* Footer */}
       <div className="project-sidebar-footer">
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={() => openHelp()}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            <HelpIcon width={16} height={16} />
+            <span>Help &amp; Docs</span>
+          </button>
+        )}
+        {collapsed && (
+          <button
+            type="button"
+            onClick={() => openHelp()}
+            className="project-sidebar-toggle-btn"
+            title="Help & Docs"
+          >
+            <HelpIcon width={16} height={16} />
+          </button>
+        )}
         <button
           type="button"
-          onClick={() => openHelp()}
-          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors"
-          style={{ color: 'var(--text-secondary)' }}
+          onClick={toggle}
+          className="project-sidebar-toggle-btn"
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          <HelpIcon width={16} height={16} />
-          <span>Help &amp; Docs</span>
+          {collapsed ? (
+            <ChevronRightIcon width={16} height={16} />
+          ) : (
+            <ChevronLeftIcon width={16} height={16} />
+          )}
         </button>
       </div>
     </aside>

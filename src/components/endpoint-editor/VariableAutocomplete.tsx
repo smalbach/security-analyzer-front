@@ -132,12 +132,12 @@ export function VariableAutocomplete({
     },
     placeholder,
     type,
-    className: `${className} font-mono`,
+    className: `${className} w-full font-mono`,
     autoComplete: 'off',
   };
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0 flex-1">
       {multiline ? (
         <textarea
           ref={inputRef as React.Ref<HTMLTextAreaElement>}
@@ -147,7 +147,7 @@ export function VariableAutocomplete({
           onClick={(e) => handleInput(value, (e.target as HTMLTextAreaElement).selectionStart ?? 0)}
           placeholder={placeholder}
           rows={rows}
-          className={`${className} font-mono`}
+          className={`${className} w-full font-mono`}
           autoComplete="off"
         />
       ) : (

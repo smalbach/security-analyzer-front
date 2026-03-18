@@ -2934,8 +2934,13 @@
     border-right: 1px solid var(--surface-border);
     overflow: hidden;
     transition:
+      width 200ms ease,
       background-color var(--motion-medium) var(--motion-smooth),
       border-color var(--motion-medium) var(--motion-smooth);
+  }
+
+  .project-sidebar--collapsed {
+    width: 60px;
   }
 
   .project-sidebar-back-btn {
@@ -3049,11 +3054,156 @@
     border-top: 1px solid var(--surface-border);
   }
 
+  /* ─── Collapsed sidebar overrides ──────────────────────────────────────── */
+  .project-sidebar--collapsed .project-sidebar-project-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem 0.5rem;
+  }
+
+  .project-sidebar--collapsed .project-sidebar-nav {
+    padding: 0.5rem 0;
+  }
+
+  .project-sidebar--collapsed .project-sidebar-item-row {
+    justify-content: center;
+  }
+
+  .project-sidebar--collapsed .project-sidebar-item {
+    justify-content: center;
+    padding: 0.65rem 0;
+    border-left-width: 3px;
+  }
+
+  .project-sidebar--collapsed .project-sidebar-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.75rem 0.5rem;
+  }
+
+  .project-sidebar-back-btn--icon-only {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 8px;
+  }
+
+  .project-sidebar-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition:
+      background-color var(--motion-fast) var(--motion-smooth),
+      border-color var(--motion-fast) var(--motion-smooth),
+      color var(--motion-fast) var(--motion-smooth);
+  }
+
+  .project-sidebar-toggle-btn:hover {
+    background: rgba(var(--accent-400), 0.08);
+    border-color: rgba(var(--accent-400), 0.35);
+    color: rgb(var(--accent-300));
+  }
+
   .project-content-area {
     flex: 1;
     min-width: 0;
     padding: 2rem;
     overflow: hidden;
+  }
+
+  /* ─── Endpoint Explorer Split Layout ───────────────────────────────────── */
+  .endpoint-explorer-split {
+    display: flex;
+    height: calc(100vh - var(--nav-height) - 4rem);
+    min-height: 400px;
+  }
+
+  .endpoint-explorer-list {
+    flex-shrink: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--accent-400), 0.2) transparent;
+  }
+
+  .endpoint-explorer-list::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .endpoint-explorer-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .endpoint-explorer-list::-webkit-scrollbar-thumb {
+    background: rgba(var(--accent-400), 0.2);
+    border-radius: 4px;
+  }
+
+  .endpoint-explorer-divider {
+    flex-shrink: 0;
+    width: 8px;
+    cursor: col-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .endpoint-explorer-divider-line {
+    width: 2px;
+    height: 40px;
+    border-radius: 2px;
+    background: var(--surface-border);
+    transition: background-color var(--motion-fast) var(--motion-smooth),
+                height var(--motion-fast) var(--motion-smooth);
+  }
+
+  .endpoint-explorer-divider:hover .endpoint-explorer-divider-line {
+    background: rgba(var(--accent-400), 0.5);
+    height: 60px;
+  }
+
+  .endpoint-explorer-detail {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    padding-left: 0.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--accent-400), 0.2) transparent;
+  }
+
+  .endpoint-explorer-detail::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .endpoint-explorer-detail::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .endpoint-explorer-detail::-webkit-scrollbar-thumb {
+    background: rgba(var(--accent-400), 0.2);
+    border-radius: 4px;
+  }
+
+  .endpoint-inline-editor {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
 
   /* Flow builder needs full-bleed canvas with explicit height for ReactFlow */
