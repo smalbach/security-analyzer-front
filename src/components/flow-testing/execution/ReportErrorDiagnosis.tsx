@@ -1,5 +1,6 @@
 import type { ErrorDiagnosis } from '../../../lib/errorDiagnosis';
 import { CATEGORY_LABELS } from '../../../lib/errorDiagnosis';
+import { CopyButton } from '../../ui/CopyButton';
 
 const CATEGORY_COLORS: Record<string, string> = {
   network: 'border-orange-500/20 bg-orange-500/10 text-orange-400',
@@ -24,6 +25,13 @@ interface ReportErrorDiagnosisProps {
 }
 
 export function ReportErrorDiagnosis({ diagnosis, onFixThis }: ReportErrorDiagnosisProps) {
+  const diagnosisText = [
+    `[${CATEGORY_LABELS[diagnosis.category]}] ${diagnosis.title}`,
+    `What happened: ${diagnosis.explanation}`,
+    `Why: ${diagnosis.cause}`,
+    `How to fix:\n${diagnosis.steps.map((s, i) => `  ${i + 1}. ${s.instruction}`).join('\n')}`,
+  ].join('\n\n');
+
   return (
     <div className="rounded-lg border border-red-500/10 bg-red-500/[0.03] p-3 space-y-2.5">
       {/* Category + Title */}
@@ -31,7 +39,8 @@ export function ReportErrorDiagnosis({ diagnosis, onFixThis }: ReportErrorDiagno
         <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${CATEGORY_COLORS[diagnosis.category] || CATEGORY_COLORS.unknown}`}>
           {CATEGORY_LABELS[diagnosis.category]}
         </span>
-        <span className="text-sm font-semibold text-red-300">{diagnosis.title}</span>
+        <span className="flex-1 text-sm font-semibold text-red-300">{diagnosis.title}</span>
+        <CopyButton text={diagnosisText} />
       </div>
 
       {/* Explanation */}
@@ -83,11 +92,16 @@ export function ReportErrorDiagnosis({ diagnosis, onFixThis }: ReportErrorDiagno
               </div>
             )}
             {diagnosis.responseBody != null && (
-              <pre className="max-h-[120px] overflow-auto text-[10px] font-mono text-slate-400 whitespace-pre-wrap break-all">
-                {typeof diagnosis.responseBody === 'string'
-                  ? diagnosis.responseBody
-                  : JSON.stringify(diagnosis.responseBody, null, 2)}
-              </pre>
+              <div className="relative group">
+                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <CopyButton text={typeof diagnosis.responseBody === 'string' ? diagnosis.responseBody : JSON.stringify(diagnosis.responseBody, null, 2)} />
+                </div>
+                <pre className="max-h-[120px] overflow-auto text-[10px] font-mono text-slate-400 whitespace-pre-wrap break-all">
+                  {typeof diagnosis.responseBody === 'string'
+                    ? diagnosis.responseBody
+                    : JSON.stringify(diagnosis.responseBody, null, 2)}
+                </pre>
+              </div>
             )}
           </div>
         </div>

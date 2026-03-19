@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import { isUnauthorizedError } from '../lib/api';
 import type { AnalysisReport, ReportFormat } from '../types/api';
 import { ReportDownloads } from '../components/ReportDownloads';
@@ -23,7 +24,7 @@ export function ReportPage() {
   const [visibility, setVisibility] = useState<'private' | 'public'>('private');
   const [currentShareToken, setCurrentShareToken] = useState<string | null>(null);
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copied, copyToClipboard } = useCopyToClipboard();
 
   const isOwner = user && report?.userId && user.id === report.userId;
 
@@ -96,10 +97,7 @@ export function ReportPage() {
   const handleCopyLink = () => {
     if (!currentShareToken || !id) return;
     const shareUrl = `${window.location.origin}/analysis/${id}?token=${currentShareToken}`;
-    void navigator.clipboard.writeText(shareUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    void copyToClipboard(shareUrl);
   };
 
   if (loading) {

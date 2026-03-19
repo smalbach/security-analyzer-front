@@ -27,9 +27,10 @@ interface ReportSummaryHeaderProps {
   onClose: () => void;
   onShowTimeline: () => void;
   httpStatusDistribution?: Record<number, number>;
+  onOpenFullScreen?: () => void;
 }
 
-export function ReportSummaryHeader({ summary, diagnoses, overallStatus, onClose, onShowTimeline, httpStatusDistribution }: ReportSummaryHeaderProps) {
+export function ReportSummaryHeader({ summary, diagnoses, overallStatus, onClose, onShowTimeline, httpStatusDistribution, onOpenFullScreen }: ReportSummaryHeaderProps) {
   const { nodeStatuses } = useFlowBuilderStore();
 
   // Group diagnoses by category
@@ -101,6 +102,20 @@ export function ReportSummaryHeader({ summary, diagnoses, overallStatus, onClose
         >
           Show live timeline
         </button>
+
+        {/* Fullscreen toggle */}
+        {onOpenFullScreen && (
+          <button
+            type="button"
+            onClick={onOpenFullScreen}
+            className="flex h-5 w-5 items-center justify-center rounded-md text-slate-500 transition hover:bg-white/5 hover:text-slate-300"
+            title="Open in full screen"
+          >
+            <svg width={14} height={14} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6}>
+              <path d="M3 7V4a1 1 0 011-1h3M13 3h3a1 1 0 011 1v3M17 13v3a1 1 0 01-1 1h-3M7 17H4a1 1 0 01-1-1v-3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
 
         {/* Close */}
         <button

@@ -1,13 +1,24 @@
 import type { AiAnalysis } from '../../types/api';
+import { CopyButton } from '../ui/CopyButton';
 
 interface TestRunAiAnalysisProps {
   analysis: AiAnalysis;
 }
 
 export function TestRunAiAnalysis({ analysis }: TestRunAiAnalysisProps) {
+  const fullText = [
+    analysis.executiveSummary,
+    ...(analysis.top5Vulnerabilities?.map(
+      (v) => `#${v.rank} ${v.title}: ${v.description}`,
+    ) || []),
+  ].join('\n\n');
+
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-glass backdrop-blur-xl">
-      <h2 className="mb-3 font-semibold text-slate-200">AI Analysis</h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="font-semibold text-slate-200">AI Analysis</h2>
+        <CopyButton text={fullText} size="sm" />
+      </div>
       <p className="text-sm text-slate-300">{analysis.executiveSummary}</p>
 
       {analysis.top5Vulnerabilities?.length ? (

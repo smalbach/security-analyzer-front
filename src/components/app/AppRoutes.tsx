@@ -17,6 +17,7 @@ import { TestRunPage } from '../../pages/TestRunPage';
 import { PerfExecutionPage } from '../../pages/PerfExecutionPage';
 import { PerfPlanExecutionsPage } from '../../pages/PerfPlanExecutionsPage';
 import { FlowBuilderPage } from '../../pages/FlowBuilderPage';
+import { IconLibraryPage } from '../../pages/IconLibraryPage';
 
 export function AppRoutes() {
   return (
@@ -75,6 +76,7 @@ export function AppRoutes() {
       />
 
       <Route path="/dashboard/ecommerce" element={<ProtectedRoute><EcommerceDashboardPage /></ProtectedRoute>} />
+      <Route path="/icon-library" element={<ProtectedRoute><IconLibraryPage /></ProtectedRoute>} />
 
       <Route path="/analysis/:id" element={<ReportPage />} />
       <Route path="*" element={<NotFoundPage />} />

@@ -1,6 +1,7 @@
 import { cn } from '../../../lib/cn';
 import { describeNodePurpose, type ErrorDiagnosis } from '../../../lib/errorDiagnosis';
 import type { FlowNodeExecution, FlowNodeStatus, FlowAssertionResult, FlowSchemaValidationResult, FlowScriptOutput, ErrorSource } from '../../../types/flow';
+import { CopyButton } from '../../ui/CopyButton';
 import { ReportErrorDiagnosis } from './ReportErrorDiagnosis';
 import { ReportRequestResponse } from './ReportRequestResponse';
 
@@ -176,7 +177,10 @@ function SchemaIssuesBlock({ schema }: { schema: FlowSchemaValidationResult }) {
 function ScriptOutputBlock({ output }: { output: FlowScriptOutput }) {
   return (
     <div className="space-y-1">
-      <div className="text-[10px] font-semibold uppercase text-slate-500">Script Output</div>
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] font-semibold uppercase text-slate-500">Script Output</div>
+        {output.logs.length > 0 && <CopyButton text={output.logs.join('\n')} />}
+      </div>
       {output.logs.length > 0 && (
         <pre className="max-h-[150px] overflow-auto rounded bg-black/30 px-2 py-1.5 text-[10px] text-slate-400 font-mono whitespace-pre-wrap break-all">
           {output.logs.join('\n')}
@@ -203,7 +207,10 @@ function ExtractedValuesBlock({ values }: { values: Record<string, unknown> }) {
 
   return (
     <div className="space-y-1">
-      <div className="text-[10px] font-semibold uppercase text-slate-500">Extracted Values</div>
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] font-semibold uppercase text-slate-500">Extracted Values</div>
+        <CopyButton text={JSON.stringify(values, null, 2)} />
+      </div>
       <div className="rounded-lg border border-white/5 bg-black/20 p-2 space-y-1">
         {entries.map(([key, val]) => (
           <div key={key} className="flex gap-2 text-[11px]">
@@ -542,7 +549,10 @@ export function ReportNodeCard({
           {/* Raw error message (when no diagnosis available) */}
           {execution?.error && !diagnosis && status !== 'skipped' && (
             <div className="space-y-1">
-              <div className="text-[10px] font-semibold uppercase text-slate-500">Error Message</div>
+              <div className="flex items-center justify-between">
+                <div className="text-[10px] font-semibold uppercase text-slate-500">Error Message</div>
+                <CopyButton text={execution.error} />
+              </div>
               <div className="rounded-lg border border-red-500/10 bg-red-500/[0.03] px-3 py-2">
                 <pre className="text-[11px] text-red-300 font-mono whitespace-pre-wrap break-all">{execution.error}</pre>
               </div>

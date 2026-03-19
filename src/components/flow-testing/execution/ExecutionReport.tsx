@@ -2,12 +2,14 @@ import { useState, useMemo, useEffect } from 'react';
 import { useFlowBuilderStore } from '../../../stores/flowBuilderStore';
 import { diagnoseError, type ErrorDiagnosis } from '../../../lib/errorDiagnosis';
 import type { FlowCanvasNodeData, FlowNodeExecution, FlowNodeStatus } from '../../../types/flow';
+import { Modal } from '../../ui/Modal';
 import { ReportSummaryHeader } from './ReportSummaryHeader';
 import { ReportNodeCard } from './ReportNodeCard';
 
 export function ExecutionReport() {
   const {
     showExecutionReport,
+    showFullScreenReport,
     fullExecutionData,
     executionSummary,
     nodes,
@@ -18,6 +20,7 @@ export function ExecutionReport() {
     setConfigPanelTab,
     setShowExecutionReport,
     setShowExecutionTimeline,
+    setShowFullScreenReport,
   } = useFlowBuilderStore();
 
   // Merge API data (has requestSnapshot/responseData) with WS data (always available)
@@ -210,17 +213,16 @@ export function ExecutionReport() {
 
   const allExpanded = renderableNodes.length > 0 && renderableNodes.every(n => expandedNodes.has(n.id));
 
-  return (
-    <div className={`absolute bottom-0 left-0 right-0 z-20 max-h-[70vh] overflow-y-auto ${accentBorder} bg-[rgba(var(--bg-900),0.97)] backdrop-blur-xl shadow-[0_-8px_30px_rgba(0,0,0,0.4)] animate-[slideUp_0.3s_ease-out]`}
-      style={{ minHeight: '180px' }}
-    >
+  const reportContent = (isFullScreen: boolean) => (
+    <>
       <ReportSummaryHeader
         summary={effectiveSummary}
         diagnoses={allDiagnoses}
         overallStatus={overallStatus}
-        onClose={() => setShowExecutionReport(false)}
+        onClose={isFullScreen ? () => setShowFullScreenReport(false) : () => setShowExecutionReport(false)}
         onShowTimeline={handleShowTimeline}
         httpStatusDistribution={httpStatusDistribution}
+        onOpenFullScreen={isFullScreen ? undefined : () => setShowFullScreenReport(true)}
       />
 
       {/* Node details section header */}
@@ -285,6 +287,30 @@ export function ExecutionReport() {
           </div>
         )}
       </div>
-    </div>
+    </>
+  );
+
+  return (
+    <>
+      {/* Bottom panel */}
+      <div className={`absolute bottom-0 left-0 right-0 z-20 max-h-[70vh] overflow-y-auto ${accentBorder} bg-[rgba(var(--bg-900),0.97)] backdrop-blur-xl shadow-[0_-8px_30px_rgba(0,0,0,0.4)] animate-[slideUp_0.3s_ease-out]`}
+        style={{ minHeight: '180px' }}
+      >
+        {reportContent(false)}
+      </div>
+
+      {/* Fullscreen modal */}
+      {showFullScreenReport && (
+        <Modal
+          open={showFullScreenReport}
+          title="Execution Report"
+          size="full"
+          onClose={() => setShowFullScreenReport(false)}
+          bodyClassName="p-0"
+        >
+          {reportContent(true)}
+        </Modal>
+      )}
+    </>
   );
 }

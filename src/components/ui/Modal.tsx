@@ -9,6 +9,7 @@ const MODAL_SIZE_CLASS = {
   lg: 'max-w-2xl',
   xl: 'max-w-4xl',
   '2xl': 'max-w-5xl',
+  full: 'max-w-[calc(100vw-2rem)]',
 } as const;
 
 type ModalSize = keyof typeof MODAL_SIZE_CLASS;
@@ -78,7 +79,10 @@ export function Modal({
           aria-modal="true"
           aria-label={title}
           className={cn(
-            'modal-panel flex w-full max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-slatewave-950/95 shadow-glass sm:max-h-[90vh]',
+            'modal-panel flex w-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-slatewave-950/95 shadow-glass',
+            size === 'full'
+              ? 'max-h-[calc(100vh-2rem)] min-h-[calc(100vh-4rem)]'
+              : 'max-h-[calc(100vh-1.5rem)] sm:max-h-[90vh]',
             MODAL_SIZE_CLASS[size],
             panelClassName,
           )}

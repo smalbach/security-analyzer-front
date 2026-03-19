@@ -1,4 +1,5 @@
 import type { ThresholdResult } from '../../../types/performance';
+import { CopyButton } from '../../ui/CopyButton';
 
 interface ThresholdResultsTableProps {
   results: ThresholdResult[];
@@ -16,7 +17,15 @@ export function ThresholdResultsTable({ results }: ThresholdResultsTableProps) {
     return <p className="text-xs text-slate-500">No thresholds configured for this plan.</p>;
   }
 
+  const resultsText = results.map(r =>
+    `${r.metric}: ${typeof r.actual === 'number' ? r.actual.toFixed(2) : r.actual} ${r.operator} ${r.threshold} → ${r.passed ? 'PASS' : 'FAIL'}`,
+  ).join('\n');
+
   return (
+    <div className="relative group">
+      <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <CopyButton text={resultsText} />
+      </div>
     <table className="w-full text-xs">
       <thead>
         <tr className="border-b border-white/10 text-left text-slate-400">
@@ -45,5 +54,6 @@ export function ThresholdResultsTable({ results }: ThresholdResultsTableProps) {
         ))}
       </tbody>
     </table>
+    </div>
   );
 }

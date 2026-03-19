@@ -1,4 +1,5 @@
 import type { PerfComparisonReport } from '../../../types/performance';
+import { CopyButton } from '../../ui/CopyButton';
 
 interface PerfComparisonViewProps {
   report: PerfComparisonReport;
@@ -22,6 +23,11 @@ export function PerfComparisonView({ report }: PerfComparisonViewProps) {
         <span className={`ml-auto text-sm font-semibold capitalize ${verdictColor}`}>
           {report.verdict}
         </span>
+        <CopyButton
+          text={report.metrics.map(m =>
+            `${m.metric}: ${m.baseline.toFixed(2)} → ${m.candidate.toFixed(2)} (${m.delta > 0 ? '+' : ''}${m.deltaPercent.toFixed(1)}%)`,
+          ).join('\n')}
+        />
       </div>
 
       <table className="w-full text-xs">

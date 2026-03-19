@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FindingGroup } from '../../types/api';
+import { CopyButton } from '../ui/CopyButton';
 import { SEVERITY_BADGE } from './constants';
 
 interface ExecutiveReportSectionProps {
@@ -78,7 +79,10 @@ function FindingGroupCard({ group }: { group: FindingGroup }) {
 
           {/* Proposed solution */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-tide-400">Proposed Solution</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wider text-tide-400">Proposed Solution</p>
+              <CopyButton text={group.proposedSolution} />
+            </div>
             <p className="mt-1 whitespace-pre-line text-sm text-slate-300">{group.proposedSolution}</p>
           </div>
 
@@ -91,7 +95,10 @@ function FindingGroupCard({ group }: { group: FindingGroup }) {
           {/* Code example */}
           {group.codeExample ? (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Code Example</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Code Example</p>
+                <CopyButton text={group.codeExample} />
+              </div>
               <pre className="mt-1 overflow-auto rounded-lg bg-black/40 p-3 font-mono text-xs text-slate-200">
                 {group.codeExample}
               </pre>

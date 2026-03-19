@@ -1,3 +1,4 @@
+import { CopyButton } from '../ui/CopyButton';
 import { getHeaderEntries } from './httpResultUtils';
 
 interface HttpHeadersListProps {
@@ -17,7 +18,10 @@ export function HttpHeadersList({
     <div className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{title}</p>
-        <span className="text-[11px] text-slate-500">{entries.length} headers</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-slate-500">{entries.length} headers</span>
+          {entries.length > 0 && <CopyButton text={entries.map(([k, v]) => `${k}: ${v}`).join('\n')} />}
+        </div>
       </div>
 
       {entries.length === 0 ? (

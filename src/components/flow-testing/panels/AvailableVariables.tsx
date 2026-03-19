@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useCopyToClipboard } from '../../../hooks/useCopyToClipboard';
 import { useTemplateCompletions, type TemplateCompletion } from '../../../hooks/useTemplateCompletions';
 import { useFlowBuilderStore } from '../../../stores/flowBuilderStore';
 import type { FlowNodeExtractor } from '../../../types/flow';
@@ -42,6 +43,7 @@ const SECTION_LABELS: Record<string, string> = {
 export function AvailableVariables({ projectId, variableMappings }: AvailableVariablesProps) {
   const completions = useTemplateCompletions(projectId);
   const [collapsed, setCollapsed] = useState(true);
+  const { copyToClipboard: clipboardCopy } = useCopyToClipboard(1500);
   const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
   const nodes = useFlowBuilderStore((s) => s.nodes);
 
@@ -98,10 +100,9 @@ export function AvailableVariables({ projectId, variableMappings }: AvailableVar
   const usedCount = usageMap.size;
 
   const copyToClipboard = (label: string) => {
-    navigator.clipboard.writeText(label).then(() => {
-      setCopiedLabel(label);
-      setTimeout(() => setCopiedLabel(null), 1500);
-    });
+    void clipboardCopy(label);
+    setCopiedLabel(label);
+    setTimeout(() => setCopiedLabel(null), 1500);
   };
 
   /** Auto-create a single extractor on the upstream node */

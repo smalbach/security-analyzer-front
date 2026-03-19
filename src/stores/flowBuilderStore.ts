@@ -41,6 +41,7 @@ interface FlowBuilderState {
   configPanelTab: 'config' | 'scripts' | 'assertions' | 'extractors';
   showExecutionTimeline: boolean;
   showExecutionReport: boolean;
+  showFullScreenReport: boolean;
   fullExecutionData: FlowExecution | null;
   stepDelayMs: number;
   globalVariables: Record<string, unknown> | null;
@@ -76,6 +77,7 @@ interface FlowBuilderState {
   setExecutionSummary: (summary: FlowExecutionSummary | null) => void;
   setShowExecutionTimeline: (show: boolean) => void;
   setShowExecutionReport: (show: boolean) => void;
+  setShowFullScreenReport: (show: boolean) => void;
   setFullExecutionData: (data: FlowExecution | null) => void;
   setStepDelayMs: (ms: number) => void;
   addLoopIteration: (loopNodeId: string, data: { index: number; total: number; item: unknown }) => void;
@@ -151,6 +153,7 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
   configPanelTab: 'config',
   showExecutionTimeline: false,
   showExecutionReport: false,
+  showFullScreenReport: false,
   fullExecutionData: null,
   stepDelayMs: 0,
   globalVariables: null,
@@ -282,6 +285,7 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
   setExecutionSummary: (summary) => set({ executionSummary: summary }),
   setShowExecutionTimeline: (show) => set({ showExecutionTimeline: show }),
   setShowExecutionReport: (show) => set({ showExecutionReport: show }),
+  setShowFullScreenReport: (show) => set({ showFullScreenReport: show }),
   setFullExecutionData: (data) => set({ fullExecutionData: data }),
   setStepDelayMs: (ms) => set({ stepDelayMs: ms }),
 
@@ -306,6 +310,7 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
       isExecuting: false,
       executionSummary: null,
       showExecutionReport: false,
+      showFullScreenReport: false,
       fullExecutionData: null,
       nodes: state.nodes.map((n) => ({
         ...n,
@@ -369,6 +374,7 @@ export const useFlowBuilderStore = create<FlowBuilderState>((set, get) => ({
       configPanelTab: 'config',
       showExecutionTimeline: false,
       showExecutionReport: false,
+      showFullScreenReport: false,
       fullExecutionData: null,
       stepDelayMs: 0,
       globalVariables: null,

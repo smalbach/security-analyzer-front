@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCopyToClipboard } from '../../hooks/useCopyToClipboard';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui';
 
@@ -8,25 +8,7 @@ interface CurlExportModalProps {
 }
 
 export function CurlExportModal({ curl, onClose }: CurlExportModalProps) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(curl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea');
-      textArea.value = curl;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  const { copied, copyToClipboard } = useCopyToClipboard();
 
   return (
     <Modal
@@ -39,7 +21,7 @@ export function CurlExportModal({ curl, onClose }: CurlExportModalProps) {
           <Button variant="secondary" onClick={onClose}>
             Close
           </Button>
-          <Button onClick={() => void handleCopy()}>
+          <Button onClick={() => void copyToClipboard(curl)}>
             {copied ? 'Copied!' : 'Copy to Clipboard'}
           </Button>
         </div>

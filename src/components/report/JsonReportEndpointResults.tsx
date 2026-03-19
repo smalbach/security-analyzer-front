@@ -1,4 +1,5 @@
 import type { FilteredReport } from '../../utils/report-utils';
+import { CopyButton } from '../ui/CopyButton';
 import { REPORT_SEVERITY_CLASS } from './constants';
 
 interface JsonReportEndpointResultsProps {
@@ -29,7 +30,10 @@ export function JsonReportEndpointResults({ filtered }: JsonReportEndpointResult
                     </p>
                     <p className="break-all text-sm text-slate-100">{endpoint.url}</p>
                   </div>
-                  <div className="text-xs text-slate-300">visible checks: {checks.length}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-300">visible checks: {checks.length}</span>
+                    <CopyButton text={checks.map(c => `[${c.passed ? 'PASS' : 'FAIL'}] ${c.ruleName} (${c.severity}): ${c.finding || ''}`).join('\n')} />
+                  </div>
                 </div>
               </summary>
 

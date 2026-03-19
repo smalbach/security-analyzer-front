@@ -1,4 +1,5 @@
 import type { TestEndpointResponse } from '../../types/api';
+import { CopyButton } from '../ui/CopyButton';
 import { TabBar } from '../ui';
 import { RESPONSE_TABS, getResponseStatusColor } from './constants';
 import type { ResponseTab } from './types';
@@ -59,13 +60,21 @@ export function EndpointResponsePanel({
           />
 
           {responseTab === 'body' ? (
-            <pre className="max-h-80 overflow-auto rounded-xl bg-black/30 p-3 font-mono text-xs text-slate-200">
-              {typeof response.body === 'string' ? response.body : JSON.stringify(response.body, null, 2)}
-            </pre>
+            <div className="relative group">
+              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <CopyButton text={typeof response.body === 'string' ? response.body : JSON.stringify(response.body, null, 2)} />
+              </div>
+              <pre className="max-h-80 overflow-auto rounded-xl bg-black/30 p-3 font-mono text-xs text-slate-200">
+                {typeof response.body === 'string' ? response.body : JSON.stringify(response.body, null, 2)}
+              </pre>
+            </div>
           ) : null}
 
           {responseTab === 'headers' ? (
             <div className="space-y-1 font-mono text-xs">
+              <div className="flex justify-end mb-1">
+                <CopyButton text={Object.entries(response.headers).map(([k, v]) => `${k}: ${v}`).join('\n')} />
+              </div>
               {Object.entries(response.headers).map(([key, value]) => (
                 <div key={key} className="flex gap-2">
                   <span className="shrink-0 text-tide-400">{key}:</span>
@@ -76,7 +85,12 @@ export function EndpointResponsePanel({
           ) : null}
 
           {responseTab === 'console' ? (
-            <div className="max-h-80 overflow-auto rounded-xl bg-black/30 p-3 font-mono text-xs">
+            <div className="relative group max-h-80 overflow-auto rounded-xl bg-black/30 p-3 font-mono text-xs">
+              {scriptLogs.length > 0 && (
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  <CopyButton text={scriptLogs.join('\n')} />
+                </div>
+              )}
               {scriptError && (
                 <div className="mb-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-red-400">
                   Script Error: {scriptError}

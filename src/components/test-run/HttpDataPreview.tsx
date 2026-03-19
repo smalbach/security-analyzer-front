@@ -1,4 +1,5 @@
 import { cn } from '../../lib/cn';
+import { CopyButton } from '../ui/CopyButton';
 import { formatByteSize, formatHttpData } from './httpResultUtils';
 
 interface HttpDataPreviewProps {
@@ -21,10 +22,11 @@ export function HttpDataPreview({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{title}</p>
         {!formattedValue.isEmpty ? (
-          <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
             <span>{formattedValue.isJson ? 'JSON' : 'Raw'}</span>
             <span>{formattedValue.lineCount} lines</span>
             <span>{formatByteSize(formattedValue.bytes)}</span>
+            <CopyButton text={formattedValue.text} />
           </div>
         ) : null}
       </div>

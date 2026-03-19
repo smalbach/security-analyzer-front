@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { SecurityCheck } from '../../types/api';
+import { CopyButton } from '../ui/CopyButton';
 import { SEVERITY_BADGE } from './constants';
 
 interface SecurityCheckItemProps {
@@ -51,6 +52,18 @@ export function SecurityCheckItem({ check }: SecurityCheckItemProps) {
 
       {expanded ? (
         <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
+          <div className="flex justify-end">
+            <CopyButton
+              text={[
+                `${check.passed ? 'PASS' : 'FAIL'} — ${check.ruleName} [${check.severity}]`,
+                check.description && `Description: ${check.description}`,
+                check.finding && `Finding: ${check.finding}`,
+                check.remediation && `Remediation: ${check.remediation}`,
+                check.evidence && `Evidence: ${check.evidence}`,
+              ].filter(Boolean).join('\n')}
+              size="sm"
+            />
+          </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Description</p>
             <p className="mt-1 text-sm text-slate-300">{check.description}</p>
@@ -69,7 +82,10 @@ export function SecurityCheckItem({ check }: SecurityCheckItemProps) {
           ) : null}
           {check.evidence ? (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Evidence</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Evidence</p>
+                <CopyButton text={check.evidence} />
+              </div>
               <pre className="mt-1 overflow-auto rounded-lg bg-black/30 p-2 font-mono text-xs text-slate-300">
                 {check.evidence}
               </pre>

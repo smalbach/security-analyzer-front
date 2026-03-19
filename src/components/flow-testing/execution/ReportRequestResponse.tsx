@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { cn } from '../../../lib/cn';
+import { CopyButton } from '../../ui/CopyButton';
 import type { FlowNodeRequestSnapshot, FlowNodeResponseData } from '../../../types/flow';
 
 const METHOD_COLORS: Record<string, string> = {
@@ -50,7 +51,10 @@ function JsonBlock({ data, maxLines = 60 }: { data: unknown; maxLines?: number }
   const display = truncated ? lines.slice(0, maxLines).join('\n') + '\n...' : formatted;
 
   return (
-    <div>
+    <div className="relative group">
+      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <CopyButton text={formatted} />
+      </div>
       <pre className="max-h-[400px] overflow-auto rounded bg-black/30 px-2.5 py-2 text-[10px] text-slate-300 font-mono whitespace-pre-wrap break-all leading-relaxed">
         {display}
       </pre>
@@ -68,8 +72,12 @@ function JsonBlock({ data, maxLines = 60 }: { data: unknown; maxLines?: number }
 }
 
 function HeadersTable({ headers }: { headers: Record<string, string> }) {
+  const headersText = Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join('\n');
   return (
-    <div className="rounded bg-black/20 overflow-hidden">
+    <div className="relative group rounded bg-black/20 overflow-hidden">
+      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <CopyButton text={headersText} />
+      </div>
       <table className="w-full text-[10px]">
         <tbody>
           {Object.entries(headers).map(([key, value]) => (
@@ -140,7 +148,8 @@ export function ReportRequestResponse({ request, response }: ReportRequestRespon
                 <span className={cn('rounded border px-1.5 py-0.5 text-[10px] font-bold shrink-0', METHOD_COLORS[request.method] || 'text-slate-400')}>
                   {request.method}
                 </span>
-                <span className="text-[11px] text-slate-200 font-mono break-all leading-relaxed">{request.url}</span>
+                <span className="flex-1 text-[11px] text-slate-200 font-mono break-all leading-relaxed">{request.url}</span>
+                <CopyButton text={request.url} className="shrink-0" />
               </div>
 
               {/* Headers — open by default */}
